@@ -8,10 +8,13 @@ import { flagUrl } from "../geo-flags.js";
 const DIVS = GEO.divisions; // 8 divisions
 const CTRY = GEO.countries; // 194 countries
 const REGIONS = GEO.regions; // 5 regions
+const DISTS = GEO.districts; // 64 districts
 const NATIONAL = GEO.national;
 
 const BD_MAP = window.BD_MAP || {};
 const BD_LABELS = window.BD_LABELS || {};
+const BD_MAP_D = window.BD_MAP_D || {};
+const BD_LABELS_D = window.BD_LABELS_D || {};
 const WORLD_MAP = window.WORLD_MAP || {};
 const WORLD_LABELS = window.WORLD_LABELS || {};
 
@@ -19,6 +22,10 @@ const divIdx = {};
 for (const d of DIVS) divIdx[d.id] = d;
 const divByEn = {};
 for (const d of DIVS) divByEn[d.en] = d;
+const distIdx = {};
+for (const d of DISTS) distIdx[d.id] = d;
+const distByEn = {};
+for (const d of DISTS) distByEn[d.en] = d;
 const ctryIdx = {}; // by id (iso3/did-use numeric)
 for (const c of CTRY) ctryIdx[c.id] = c;
 const ctryByFlag = {};
@@ -80,12 +87,15 @@ const L = {
     capital: "Capital", flag: "Flag",
     qtypes: {
       "bd-hq": "Division from HQ", "bd-fact": "Division from fact", "bd-find": "Find division on map",
+      "d-div": "Division → District", "div-d": "District → Division", "d-find": "Find district on map",
       "wf": "Flag → Country", "wc": "Country → Flag", "wh": "Country → Capital", "hc": "Capital → Country",
       "world-find": "Find country on map",
     },
     qprompts: {
       "bd-hq": "Which division has the headquarters in {X}?",
       "bd-fact": "Which division is this?",
+      "d-div": "Which district is in {X}?",
+      "div-d": "Which division is {X} in?",
       "wf": "Which country's flag is this?",
       "wc": "Which flag belongs to {X}?",
       "wh": "What is the capital of {X}?",
@@ -115,6 +125,9 @@ const L = {
     soundEff: "Sound effects", soundEffSub: "Correct, wrong & celebration sounds",
     badgeTitle: "Badges", badgeNone: "Complete quizzes to earn badges!",
     level: "Level",
+    levelDivisions: "Divisions", levelDistricts: "Districts",
+    inDivision: "In {X}", district: "District", districts_: "districts",
+    density: "Density", districtPractise: "Practice the district {d} — it is in the {dv} division.",
   },
   bn: {
     brand: "জিও বাডি", brandSub: "বাংলাদেশ • বিশ্ব",
@@ -159,12 +172,15 @@ const L = {
     capital: "রাজধানী", flag: "পতাকা",
     qtypes: {
       "bd-hq": "সদর দপ্তর থেকে বিভাগ", "bd-fact": "তথ্য থেকে বিভাগ", "bd-find": "মানচিত্রে বিভাগ খুঁজো",
+      "d-div": "বিভাগ → জেলা", "div-d": "জেলা → বিভাগ", "d-find": "মানচিত্রে জেলা খুঁজো",
       "wf": "পতাকা → দেশ", "wc": "দেশ → পতাকা", "wh": "দেশ → রাজধানী", "hc": "রাজধানী → দেশ",
       "world-find": "মানচিত্রে দেশ খুঁজো",
     },
     qprompts: {
       "bd-hq": "কোন বিভাগের সদর দপ্তর {X}?",
       "bd-fact": "কোন বিভাগের কথা বলা হয়েছে?",
+      "d-div": "কোন জেলা {X}-এ আছে?",
+      "div-d": "{X} কোন বিভাগে?",
       "wf": "এটি কোন দেশের পতাকা?",
       "wc": "{X} কোন পতাকা?",
       "wh": "{X}-এর রাজধানী কী?",
@@ -195,6 +211,9 @@ const L = {
     soundEff: "সাউন্ড ইফেক্ট", soundEffSub: "সঠিক, ভুল ও উল্লাসের সাউন্ড",
     badgeTitle: "ব্যাজ", badgeNone: "কুইজ সম্পন্ন করে ব্যাজ অর্জন করো!",
     level: "স্তর",
+    levelDivisions: "বিভাগ", levelDistricts: "জেলা",
+    inDivision: "{X} বিভাগে", district: "জেলা", districts_: "টি জেলা",
+    density: "ঘনত্ব", districtPractise: "{dv} বিভাগের মধ্যে {d} জেলাটি চর্চা করো।",
   },
 };
 let _lang = "en";
@@ -203,6 +222,7 @@ function tvar(k, map) { let s = t(k); for (const [a, b] of Object.entries(map)) 
 function name(div) { return _lang === "bn" ? div.bn : div.en; }
 function cname(c) { return _lang === "bn" ? c.bn : c.en; }
 function cap(c) { return _lang === "bn" ? c.capitalBn : c.capitalEn; }
+function dname(d) { return _lang === "bn" ? d.bn : d.en; }
 function regionBn(r) { const rr = REGIONS.find((x) => x.en === r); return rr && _lang === "bn" ? rr.bn : r; }
 
 /* ================= store ================= */
@@ -539,21 +559,31 @@ MOUNT.home = (p) => {};
 /* ---------- explore (library) ---------- */
 function screenExplore(params = {}) {
   const scope = params.scope || "bd";
+  const level = params.level || "div";
   const regionF = params.region || "all";
   const favF = params.fav || false;
   const q = params.q || "";
+  const bdLevel = scope === "bd" ? `
+    <div class="chips level-chips">
+      <button class="chip ${level === "div" ? "on" : ""}" data-action="explore-level" data-level="div">🗺️ ${t("levelDivisions")}</button>
+      <button class="chip ${level === "dist" ? "on" : ""}" data-action="explore-level" data-level="dist">🧩 ${t("levelDistricts")}</button>
+    </div>` : "";
+  const bdDivChips = scope === "bd" && level === "dist" ? `
+    <button class="fchip ${regionF === "all" ? "on" : ""}" data-action="explore-region" data-region="all">${t("regionAll")}</button>
+    ${DIVS.map((d) => `<button class="fchip ${regionF === d.id ? "on" : ""}" data-action="explore-region" data-region="${d.id}">${_lang === "bn" ? d.bn : d.en}</button>`).join("")}` : "";
   return html(`
     <div class="tabs">
       <button class="tab ${scope === "bd" ? "on" : ""}" data-action="explore-scope" data-scope="bd">${t("sectionBD")}</button>
       <button class="tab ${scope === "world" ? "on" : ""}" data-action="explore-scope" data-scope="world">${t("sectionWorld")}</button>
     </div>
+    ${bdLevel}
     <input class="search" data-q value="${q}" placeholder="${t("search")}">
     <div class="filter-row">
       <button class="fchip ${favF ? "on" : ""}" data-action="explore-fav" data-fav="1">⭐ ${t("favorites")}</button>
       ${scope === "world"
         ? `<button class="fchip ${regionF === "all" ? "on" : ""}" data-action="explore-region" data-region="all">${t("regionAll")}</button>
            ${REGIONS.map((r) => `<button class="fchip ${regionF === r.id ? "on" : ""}" data-action="explore-region" data-region="${r.id}">${_lang === "bn" ? r.bn : r.en}</button>`).join("")}`
-        : ""}
+        : bdDivChips}
     </div>
     <div id="explore-list"></div>`);
 }
@@ -565,9 +595,17 @@ MOUNT.explore = (params = {}) => {
     const q = (APP.querySelector("[data-q]").value || "").trim().toLowerCase();
     const regionF = params.region || "all";
     const favF = !!params.fav;
+    const level = params.level || "div";
     const p = profile();
     let items = [];
-    if (scope === "bd") {
+    if (scope === "bd" && level === "dist") {
+      items = DISTS.filter((d) => regionF === "all" || d.div === regionF).map((d) => ({
+        key: "z|" + d.id, kind: "z", id: d.id, img: null, ring: avatarEmoji(d.div),
+        nm: dname(d), sb: `${t("inDivision", { X: name(divIdx[d.div]) })} · ${fmtNum(d.pop)} ${t("pop").toLowerCase()}`,
+        st: starShown(p, "z", d.id),
+        open: () => go("detail", { kind: "z", id: d.id }),
+      }));
+    } else if (scope === "bd") {
       items = DIVS.map((d) => ({
         key: "div|" + d.id, kind: "d", id: d.id, img: null, ring: avatarEmoji(d.id),
         nm: name(d), sb: `${d.districts} ${t("districts")} · ${t("hq")}: ${_lang === "bn" ? d.hqBn : d.hq}`, st: starShown(p, "d", d.id),
@@ -660,6 +698,33 @@ function screenDetail(params) {
       </div>
       <div class="btn-row"><button class="btn btn-primary" data-nav="play" data-daily="1">▶ ${t("play")}</button></div>`);
   }
+  if (kind === "z") {
+    const d = distIdx[id];
+    const stN = starShown(p, "z", id);
+    const favH = isFav(p, "z", id);
+    const div = divIdx[d.div];
+    const speakMe = () => speak(_lang === "bn" ? d.bn : d.en, _lang);
+    return html(`
+      <div style="text-align:center;margin:6px 0">
+        <h1 style="color:var(--green)">${dname(d)}</h1>
+        <span class="stars">${"★".repeat(stN)}${"☆".repeat(3 - stN)}</span>
+        <div class="official-txt">${t("district")} · ${name(div)}</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-paper btn-small" data-action="listen"><span class="icon-txt">🔊</span> ${t("listen")}</button>
+        <button class="btn btn-paper btn-small ${favH ? "fav-on" : ""}" data-action="fav"><span class="icon-txt">${favH ? "⭐" : "☆"}</span> ${t("favorite")}</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="stat-grid">
+          <div class="stat"><b>${name(div)}</b><small>${t("division")}</small></div>
+          <div class="stat"><b>${fmtNum(d.pop)}</b><small>${t("pop")}</small></div>
+          <div class="stat"><b>${fmtNum(d.areaKm2)} km²</b><small>${t("area")}</small></div>
+          <div class="stat"><b>${fmtNum(d.density)}/km²</b><small>${t("density")}</small></div>
+        </div>
+        <div class="factbox">${tvar("districtPractise", { d: dname(d), dv: name(div) })}</div>
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" data-nav="play">▶ ${t("play")}</button></div>`);
+  }
   const c = ctryIdx[id];
   const stN = starShown(p, "c", id);
   const favH = isFav(p, "c", id);
@@ -695,15 +760,16 @@ function screenDetail(params) {
 }
 MOUNT.detail = (params) => {
   const p = profile();
-  const item = params.kind === "div" ? divIdx[params.id] : ctryIdx[params.id];
+  const item = params.kind === "div" ? divIdx[params.id] : params.kind === "z" ? distIdx[params.id] : ctryIdx[params.id];
+  const favT = params.kind === "div" ? "d" : params.kind === "z" ? "z" : "c";
   bindAction(APP, "listen", (e, btn) => {
     _lang === "bn" ? speak(item.bn, _lang) : speak(item.en, _lang);
   });
   bindAction(APP, "fav", (e, btn) => {
-    const v = toggleFav(profile(), params.kind === "div" ? "d" : "c", params.id);
+    const v = toggleFav(profile(), favT, params.id);
     btn.classList.toggle("fav-on", v);
     btn.innerHTML = `<span class="icon-txt">${v ? "⭐" : "☆"}</span> ${t("favorite")}`;
-    toast(v ? "⭐ " + (params.kind === "div" ? name(item) : cname(item)) : t("favoriteRemoved"));
+    toast(v ? "⭐ " + (params.kind === "div" ? name(item) : params.kind === "z" ? dname(item) : cname(item)) : t("favoriteRemoved"));
   });
   speak(_lang === "bn" ? item.bn : item.en, _lang);
 };
@@ -741,11 +807,13 @@ MOUNT.play = (p) => {};
 
 /* ---------- custom quiz setup ---------- */
 let SETUP = { scope: "bd", types: [], count: 10, adaptive: false };
-const ALL_TYPES = ["bd-hq", "bd-fact", "bd-find", "wf", "wc", "wh", "hc", "world-find"];
+const ALL_TYPES = ["bd-hq", "bd-fact", "bd-find", "d-div", "div-d", "d-find", "wf", "wc", "wh", "hc", "world-find"];
+const BD_TYPES = ["bd-hq", "bd-fact", "bd-find", "d-div", "div-d", "d-find"];
+const WORLD_TYPES = ["wf", "wc", "wh", "hc", "world-find"];
 function screenCustom() {
   const scope = SETUP.scope;
-  const shown = scope === "bd" ? ["bd-hq", "bd-fact", "bd-find"]
-    : scope === "world" ? ["wf", "wc", "wh", "hc", "world-find"]
+  const shown = scope === "bd" ? BD_TYPES
+    : scope === "world" ? WORLD_TYPES
       : ALL_TYPES;
   if (!SETUP.types.length) SETUP.types = shown.slice(0, 3);
   return html(`
@@ -828,26 +896,28 @@ function buildQuestionList({ scope, types, count, adaptive }) {
   let pool = [];
   if (scope === "bd" || scope === "both") {
     for (const ty of ["bd-hq", "bd-fact", "bd-find"]) if (types.includes(ty)) pool.push(...divQuestions(ty));
+    for (const ty of ["d-div", "div-d", "d-find"]) if (types.includes(ty)) pool.push(...distQuestions(ty));
   }
   if (scope === "world" || scope === "both") {
     for (const ty of ["wf", "wc", "wh", "hc", "world-find"]) if (types.includes(ty)) pool.push(...countryQuestions(ty));
   }
   if (!pool.length) return [];
   const p = profile();
+  const qKey = (q) => itemKey(q.type, q.itemId || q.answerId);
   if (adaptive) {
     const w = pool.map((q) => {
-      const s = p.itemStats[itemKey(q.type, q.answerId)];
+      const s = p.itemStats[qKey(q)];
       return 1 + (s ? Math.pow(s.a - s.ok, 2) : 0);
     });
     // weighted shuffle: Fisher–Yates with weights
     const arr = pool.slice();
     const out = [];
     while (arr.length) {
-      const total = arr.reduce((sum, q, i) => sum + (1 + (p.itemStats[itemKey(q.type, q.answerId)] ? Math.pow(p.itemStats[itemKey(q.type, q.answerId)].a - p.itemStats[itemKey(q.type, q.answerId)].ok, 2) : 0)), 0);
+      const total = arr.reduce((sum, q) => sum + (1 + (p.itemStats[qKey(q)] ? Math.pow(p.itemStats[qKey(q)].a - p.itemStats[qKey(q)].ok, 2) : 0)), 0);
       let r = Math.random() * total, pick = 0;
       for (let i = 0; i < arr.length; i++) {
         const q = arr[i];
-        const ww = 1 + (p.itemStats[itemKey(q.type, q.answerId)] ? Math.pow(p.itemStats[itemKey(q.type, q.answerId)].a - p.itemStats[itemKey(q.type, q.answerId)].ok, 2) : 0);
+        const ww = 1 + (p.itemStats[qKey(q)] ? Math.pow(p.itemStats[qKey(q)].a - p.itemStats[qKey(q)].ok, 2) : 0);
         r -= ww;
         if (r <= 0) { pick = i; break; }
       }
@@ -859,6 +929,21 @@ function buildQuestionList({ scope, types, count, adaptive }) {
   }
   if (count > 0) return pool.slice(0, count);
   return pool.slice(0, Math.max(20, Math.min(pool.length, 40)));
+}
+function distQuestions(ty) {
+  return DISTS.map((d) => {
+    const div = divIdx[d.div];
+    if (ty === "d-div") {
+      return { type: "d-div", kind: "text", answerId: d.id, prompt: tvar("qprompts.d-div", { X: name(div) }), choices: fillChoices(DISTS, d, (x) => dname(x), { regionBias: true, regionKey: "div" }) };
+    }
+    if (ty === "div-d") {
+      return { type: "div-d", kind: "text", answerId: div.id, itemId: d.id, prompt: tvar("qprompts.div-d", { X: dname(d) }), choices: fillChoices(DIVS, div, (x) => name(x)) };
+    }
+    if (ty === "d-find") {
+      return { type: "d-find", kind: "map", map: "bd-d", answerId: d.id, prompt: tvar("findPromptBD", { X: dname(d) }) };
+    }
+    return null;
+  }).filter(Boolean);
 }
 function divQuestions(ty) {
   return DIVS.map((d) => {
@@ -917,7 +1002,7 @@ function fillChoices(pool, answer, labelFn, opts = {}) {
 /* ---------- daily questions (deterministic) ---------- */
 function buildDailyQuestions() {
   const rng = mulberry(Number(todayKey().replace(/-/g, "")));
-  const plan = ["bd-hq", "bd-hq", "bd-fact", "bd-find", "bd-find", "wf", "wf", "wh", "hc", "world-find"];
+  const plan = ["bd-hq", "bd-fact", "d-div", "bd-find", "d-find", "wf", "wf", "wh", "hc", "world-find"];
   const out = [];
   const rpick = (arr) => arr[Math.floor(rng() * arr.length)];
   const rsh = (arr) => { const b = arr.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
@@ -925,6 +1010,13 @@ function buildDailyQuestions() {
     if (ty === "bd-hq" || ty === "bd-fact" || ty === "bd-find") {
       const q = rpick(divQuestions(ty));
       if (q) { q.choices = fillChoices(DIVS, divIdx[q.answerId], (x) => name(x)); out.push(q); }
+    } else if (ty === "d-div" || ty === "div-d" || ty === "d-find") {
+      const q = rpick(distQuestions(ty));
+      if (q) {
+        if (ty === "d-div") q.choices = fillChoices(DISTS, distIdx[q.answerId], (x) => dname(x), { regionBias: true, regionKey: "div" });
+        else if (ty === "div-d") q.choices = fillChoices(DIVS, divIdx[q.answerId], (x) => name(x));
+        out.push(q);
+      }
     } else {
       const q = rpick(countryQuestions(ty));
       if (q && q.answerId) {
@@ -1001,7 +1093,7 @@ function mapQuestionHTML(s, q, n) {
   return `${qHead(s)}${qBar(s)}
     <div class="q-prompt">${q.prompt}</div>
     <div class="map-wrap">
-      <canvas class="map-canvas" data-mapcanvas="1" width="${q.map === "bd" ? 640 : 900}" height="${q.map === "bd" ? 840 : 460}"></canvas>
+      <canvas class="map-canvas" data-mapcanvas="1" width="${q.map === "bd" || q.map === "bd-d" ? 640 : 900}" height="${q.map === "bd" || q.map === "bd-d" ? 840 : 460}"></canvas>
       <div class="map-hint">${t("map.hint.quiz")}</div>
     </div>`;
 }
@@ -1045,9 +1137,13 @@ function answerSession(s, q, pick, spot, correctId) {
   setTimeout(() => { s.idx++; showNext(S); }, ok ? 950 : 1800);
 }
 function bumpAndStars(p, q, ok) {
-  const entType = q.map === "bd" || q.type.startsWith("bd") ? "d" : "c";
-  bumpItem(p, entType, q.answerId, ok);
-  addStars(p, entType, q.answerId, ok);
+  const ansId = q.itemId || q.answerId;
+  let entType;
+  if (q.type === "bd-hq" || q.type === "bd-fact" || q.map === "bd") entType = "d";
+  else if (q.type === "d-div" || q.type === "div-d" || q.type === "d-find" || q.map === "bd-d") entType = "z";
+  else entType = "c";
+  bumpItem(p, entType, ansId, ok);
+  addStars(p, entType, ansId, ok);
 }
 function applyFeedback(q, ok, pick, spot) {
   vibrate(ok ? 30 : 80);
@@ -1066,7 +1162,8 @@ function applyFeedback(q, ok, pick, spot) {
     });
   }
   const rightLabel = q.kind === "map"
-    ? (q.map === "bd" ? name(divIdx[q.answerId]) : cname(ctryIdx[q.answerId]))
+    ? (q.map === "bd-d" ? (distIdx[q.answerId] ? dname(distIdx[q.answerId]) : q.answerId)
+       : q.map === "bd" ? name(divIdx[q.answerId]) : cname(ctryIdx[q.answerId]))
     : (q.choices.find((c) => c.id === q.answerId) || { label: "" }).label;
   if (ok) {
     toast("✅ " + t("correct"));
@@ -1148,8 +1245,16 @@ function screenResults(params) {
     <div class="card" style="text-align:left">
       <h3>${t("wrongList")}</h3>
       <ul class="wrong-list" style="padding-left:0;margin-top:8px;list-style:none">${r.wrong.map((q) => {
-        const correctId = q.answerId;
-        const correctName = q.type === "bd-fact" || q.kind === "map" && q.map === "bd" ? name(divIdx[correctId]) : cname(ctryIdx[correctId]);
+        const correctId = q.itemId || q.answerId;
+        let correctName;
+        if (q.map === "bd-d" || q.type === "d-div" || q.type === "d-find" || q.type === "div-d") {
+          const dd = distIdx[correctId] || distIdx[q.answerId];
+          correctName = dd ? dname(dd) : correctId;
+        } else if (q.type === "bd-fact" || (q.kind === "map" && q.map === "bd")) {
+          correctName = name(divIdx[correctId]);
+        } else {
+          correctName = cname(ctryIdx[correctId]);
+        }
         const lbl = q.choices ? (q.choices.find((c) => c.id === correctId) || { label: correctName }).label : correctName;
         const icon = q.kind === "map" ? "📍 " : q.kind === "flag" ? `🏳️ ` : q.flagCode ? "❤️ " : "💬 ";
         return `<li style="margin:6px 0"><span class="qw">${q.prompt.replace(/^❓\s*/, "").slice(0, 70)}</span><br><span class="qa">✅ ${icon}${lbl}</span></li>`;
@@ -1189,18 +1294,18 @@ MOUNT.results = (params) => {
 let MODEL_CACHE = {};
 function makeMapModel(kind) {
   if (MODEL_CACHE[kind]) return MODEL_CACHE[kind];
-  const src = kind === "bd" ? BD_MAP : WORLD_MAP;
-  const W = kind === "bd" ? 640 : 900;
-  const H = kind === "bd" ? 840 : 460;
+  const src = kind === "bd" ? BD_MAP : kind === "bd-d" ? BD_MAP_D : WORLD_MAP;
+  const W = kind === "bd" || kind === "bd-d" ? 640 : 900;
+  const H = kind === "bd" || kind === "bd-d" ? 840 : 460;
   const entries = Object.entries(src).map(([k, d]) => {
-    const key = kind === "bd" ? k : String(k);
+    const key = kind === "bd" || kind === "bd-d" ? k : String(k);
     let path;
     try { path = new Path2D(d); } catch { path = null; }
     return { key, d, path };
   }).filter((x) => x.path);
   const model = { kind, W, H, entries };
   const divBase = { "Barishal": "barishal", "Chattogram": "chattogram", "Dhaka": "dhaka", "Khulna": "khulna", "Rajshahi": "rajshahi", "Rangpur": "rangpur", "Sylhet": "sylhet", "Mymensingh": "mymensingh" };
-  model.toId = (k) => (kind === "bd" ? (divBase[k] || k) : dbMapsKeyToId(k));
+  model.toId = (k) => (kind === "bd" ? (divBase[k] || k) : kind === "bd-d" ? k : dbMapsKeyToId(k));
   model.scratch = document.createElement("canvas").getContext("2d"); // identity CTM: logical coords
   model.hit = (x, y) => {
     for (let i = model.entries.length - 1; i >= 0; i--) {
@@ -1221,10 +1326,29 @@ function dbMapsKeyToId(k) {
 const PALETTE = {
   bd: ["#E9C46A", "#F49B1F", "#2FA56A", "#2C6E8A", "#8D6E63", "#6A5ACD", "#C0392B", "#189AB4"],
 };
-function colorForBD(id) {
-  const i = Object.keys(divIdx).indexOf(id.toLowerCase());
+const DIV_PALETTE = {
+  barishal: "#E9C46A", chattogram: "#F49B1F", dhaka: "#2FA56A",
+  khulna: "#2C6E8A", mymensingh: "#8D6E63", rajshahi: "#6A5ACD",
+  rangpur: "#C0392B", sylhet: "#189AB4",
+};
+function colorForBD(id, kind) {
+  if (kind === "bd-d") {
+    const d = distIdx[id];
+    const base = DIV_PALETTE[d && d.div] || "#DCEFD6";
+    const i = Math.abs(hashStr(id)) % 5;
+    return tint(base, 1 - i * 0.10);
+  }
   const pal = PALETTE.bd;
+  const i = Object.keys(divIdx).indexOf(id.toLowerCase());
   return pal[((i % pal.length) + pal.length) % pal.length];
+}
+function hashStr(s) { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) | 0; return h; }
+function tint(hex, light) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  const nr = Math.round(r + (255 - r) * (1 - light));
+  const ng = Math.round(g + (255 - g) * (1 - light));
+  const nb = Math.round(b + (255 - b) * (1 - light));
+  return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
 }
 function drawMap(canvas, md, opts = {}) {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1240,6 +1364,10 @@ function drawMap(canvas, md, opts = {}) {
   ctx.lineJoin = "round";
   const divOf = (id) => {
     if (md.kind === "bd") return String(id || "").toLowerCase();
+    if (md.kind === "bd-d") {
+      const d = distIdx[id];
+      return d ? d.div : String(id || "").toLowerCase();
+    }
     const c = ctryIdx[id]; return c ? c.id : id;
   };
   for (const en of md.entries) {
@@ -1274,6 +1402,17 @@ function drawMap(canvas, md, opts = {}) {
       ctx.fillText(_lang === "bn" ? (divIdx[id] ? divIdx[id].bn : k) : k, x, y + 9);
     }
   }
+  if (labelOn && md.kind === "bd-d") {
+    ctx.fillStyle = "#0E3B2E";
+    ctx.font = "600 11px 'Noto Sans Bengali', sans-serif";
+    ctx.textAlign = "center";
+    for (const [k, [x, y]] of Object.entries(BD_LABELS_D)) {
+      const id = md.toId(k);
+      if (interact && id === opts.target) continue;
+      const d = distIdx[id];
+      ctx.fillText(d ? dname(d) : k, x, y + 4);
+    }
+  }
   if (labelOn && md.kind === "world") {
     ctx.fillStyle = "rgba(14,59,46,.85)";
     ctx.font = "600 13px 'Noto Sans Bengali', sans-serif";
@@ -1301,16 +1440,16 @@ function drawMap(canvas, md, opts = {}) {
   // legend
   const legend = APP.querySelector(".map-legend");
   if (legend) {
-    legend.innerHTML = md.kind === "bd"
-      ? DIVS.map((d) => `<span><span class="sw" style="background:${colorForBD(d.id)}"></span>${_lang === "bn" ? d.bn : d.en}</span>`).join("")
+    legend.innerHTML = md.kind === "bd" || md.kind === "bd-d"
+      ? DIVS.map((d) => `<span><span class="sw" style="background:${DIV_PALETTE[d.id]}"></span>${_lang === "bn" ? d.bn : d.en}</span>`).join("")
       : "";
   }
 }
 function normalFill(md, id, opts) {
-  if (opts.ok && md.kind === "bd" && String(id) === String(opts.target)) return "#2FA56A";
+  if (opts.ok && (md.kind === "bd" || md.kind === "bd-d") && String(id) === String(opts.target)) return "#2FA56A";
   if (opts.ok && md.kind === "world" && String(id) === String(opts.target)) return "#2FA56A";
   if (opts.picked && String(id) === String(opts.picked) && !opts.ok) return "#F49B1F";
-  if (md.kind === "bd") return colorForBD(id);
+  if (md.kind === "bd" || md.kind === "bd-d") return colorForBD(id, md.kind);
   const c = ctryIdx[id];
   const tier = c ? (c.area > 200000 ? "#9CCF9D" : c.area > 20000 ? "#BFD9A8" : "#D8E6C2") : "#E8E8D5";
   return tier;
@@ -1332,21 +1471,30 @@ function evToCanvas(canvas, md, e) {
 /* ---------- map explorer screen ---------- */
 function screenMap(params = {}) {
   const kind = params.kind || "bd";
+  const level = params.level || (kind === "bd" ? "div" : "world");
+  const bdLevel = kind === "bd" ? `
+    <div class="chips level-chips">
+      <button class="chip ${level === "div" ? "on" : ""}" data-action="map-level" data-level="div">🗺️ ${t("levelDivisions")}</button>
+      <button class="chip ${level === "dist" ? "on" : ""}" data-action="map-level" data-level="dist">🧩 ${t("levelDistricts")}</button>
+    </div>` : "";
+  const W = kind === "bd-d" ? 640 : kind === "bd" ? 640 : 900;
+  const H = kind === "bd-d" ? 840 : kind === "bd" ? 840 : 460;
   return html(`
     <div class="tabs">
-      <button class="tab ${kind === "bd" ? "on" : ""}" data-action="map-kind" data-kind="bd">🇧🇩 ${t("sectionBD")}</button>
+      <button class="tab ${kind === "bd" || kind === "bd-d" ? "on" : ""}" data-action="map-kind" data-kind="bd">🇧🇩 ${t("sectionBD")}</button>
       <button class="tab ${kind === "world" ? "on" : ""}" data-action="map-kind" data-kind="world">🌍 ${t("sectionWorld")}</button>
     </div>
+    ${bdLevel}
     <div class="map-wrap">
-      <canvas class="map-canvas" data-mapcanvas="1" width="${kind === "bd" ? 640 : 900}" height="${kind === "bd" ? 840 : 460}" style="width:100%"></canvas>
+      <canvas class="map-canvas" data-mapcanvas="1" width="${W}" height="${H}" style="width:100%"></canvas>
       <div class="map-hint" id="maptip"></div>
     </div>
     <div class="map-legend"></div>
-    <div class="card" id="mapinfo"><p style="color:var(--ink-soft)">👆 ${t(kind === "bd" ? "map.hint.bd" : "map.hint.world")}</p></div>
+    <div class="card" id="mapinfo"><p style="color:var(--ink-soft)">👆 ${t(kind === "bd" || kind === "bd-d" ? "map.hint.bd" : "map.hint.world")}</p></div>
     <div class="btn-row"><button class="btn btn-paper" data-nav="play">🎯 ${t("play")}</button></div>`);
 }
 MOUNT.map = (params = {}) => {
-  const kind = params.kind || "bd";
+  const kind = params.kind === "world" ? "world" : (params.level === "dist" ? "bd-d" : "bd");
   const canvas = APP.querySelector("[data-mapcanvas]");
   const md = makeMapModel(kind);
   let hover = null;
@@ -1359,24 +1507,25 @@ MOUNT.map = (params = {}) => {
     const id = md.hit(pt.x, pt.y);
     const tip = APP.querySelector("#maptip");
     const info = APP.querySelector("#mapinfo");
+    const isBD = kind === "bd" || kind === "bd-d";
     if (id && id !== hover) {
       hover = id;
-      const nm = kind === "bd" ? name(divIdx[id]) : cname(ctryIdx[id]);
+      const nm = isBD ? (kind === "bd-d" ? dname(distIdx[id]) : name(divIdx[id])) : cname(ctryIdx[id]);
       tip.textContent = nm;
       redraw();
       drawLabel(canvas, md, id);
-      info.innerHTML = infoRow(kind === "bd" ? divIdx[id] : ctryIdx[id], kind);
+      info.innerHTML = infoRow(kind === "bd-d" ? distIdx[id] : kind === "bd" ? divIdx[id] : ctryIdx[id], kind);
     } else if (!id && hover) {
       hover = null;
-      tip.textContent = t(kind === "bd" ? "map.hint.bd" : "map.hint.world");
+      tip.textContent = t(isBD ? "map.hint.bd" : "map.hint.world");
       redraw();
-      info.innerHTML = `<p style="color:var(--ink-soft)">👆 ${t(kind === "bd" ? "map.hint.bd" : "map.hint.world")}</p>`;
+      info.innerHTML = `<p style="color:var(--ink-soft)">👆 ${t(isBD ? "map.hint.bd" : "map.hint.world")}</p>`;
     }
   });
   canvas.addEventListener("pointerdown", (e) => {
     const pt = evToCanvas(canvas, md, e);
     const id = md.hit(pt.x, pt.y);
-    if (id) go("detail", kind === "bd" ? { kind: "div", id } : { kind: "c", id });
+    if (id) go("detail", kind === "world" ? { kind: "c", id } : kind === "bd-d" ? { kind: "z", id } : { kind: "div", id });
   });
 };
 function drawLabel(canvas, md, id) {
@@ -1385,18 +1534,26 @@ function drawLabel(canvas, md, id) {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   ctx.fillStyle = "rgba(14,59,46,.92)";
   ctx.fillRect(0, 0, canvas.width / dpr, 44);
-  const big = md.kind === "bd" ? name(divIdx[id]) : cname(ctryIdx[id]);
+  const isBD = md.kind === "bd" || md.kind === "bd-d";
+  const big = md.kind === "bd" ? name(divIdx[id]) : md.kind === "bd-d" ? dname(distIdx[id]) : cname(ctryIdx[id]);
   ctx.fillStyle = "#fff";
   ctx.font = "700 16px 'Noto Sans Bengali', sans-serif";
   ctx.fillText(big, x, y);
   ctx.fillStyle = "#FBF3E2";
   ctx.font = "11px 'Noto Sans Bengali', sans-serif";
-  ctx.fillText(md.kind === "bd" ? t("division") : t("capital") + ": " + (md.kind === "bd" ? (_lang === "bn" ? divIdx[id].hqBn : divIdx[id].hq) : cap(ctryIdx[id])), x, y + 14);
+  ctx.fillText(md.kind === "bd"
+    ? t("division")
+    : md.kind === "bd-d" ? t("inDivision", { X: name(divIdx[distIdx[id].div]) })
+    : t("capital") + ": " + cap(ctryIdx[id]), x, y + 14);
 }
 function infoRow(obj, kind) {
   if (kind === "bd") {
     const d = obj;
     return `<b style="color:var(--green)">${name(d)}</b> · ${fmtNum(d.pop)} ${t("pop").toLowerCase()} · ${t("hq")} ${_lang === "bn" ? d.hqBn : d.hq}`;
+  }
+  if (kind === "bd-d") {
+    const d = obj;
+    return `<b style="color:var(--green)">${dname(d)}</b> · ${t("district")} · ${name(divIdx[d.div])} · ${fmtNum(d.pop)} ${t("pop").toLowerCase()}`;
   }
   const c = obj;
   return `<b style="color:var(--green)">${cname(c)}</b> · ${cap(c)} · ${c.iso3}`;
@@ -1440,7 +1597,17 @@ MOUNT.pin = (params = {}) => {
       if (buf === D.settings.pin) {
         go("parent");
         toast(t("pinUnlocked") + " 🔓");
-      } else {
+} else if (opts.regionKey && answer[opts.regionKey] && pool.some((x) => x !== answer && x[opts.regionKey] === answer[opts.regionKey])) {
+    const same = shuffle(pool.filter((x) => x.id !== answer.id && x[opts.regionKey] === answer[opts.regionKey]));
+    const others = shuffle(pool.filter((x) => x.id !== answer.id && x[opts.regionKey] !== answer[opts.regionKey]));
+    base = [];
+    let si = 0, oi = 0;
+    while (base.length < N) {
+      if (same[si]) base.push(same[si++]);
+      else if (others[oi]) base.push(others[oi++]);
+      else break;
+    }
+  } else {
         toast(t("pinWrong") + " ❌");
         buf = "";
       }
@@ -1559,10 +1726,22 @@ document.addEventListener("click", (e) => {
     newProfile("p" + Date.now().toString(36));
     render("who"); openNameModal();
   } else if (a === "explore-scope") {
-    replace("explore", { scope: act.getAttribute("data-scope") });
+    const cur = stack[stack.length - 1].params || {};
+    const scope = act.getAttribute("data-scope");
+    replace("explore", { ...cur, scope, level: scope === "bd" ? (cur.level || "div") : undefined, region: "all" });
+  } else if (a === "explore-level") {
+    const cur = stack[stack.length - 1].params || {};
+    replace("explore", { ...cur, level: act.getAttribute("data-level"), region: "all" });
   } else if (a === "explore-region") {
     const cur = stack[stack.length - 1].params || {};
     replace("explore", { ...cur, region: act.getAttribute("data-region") });
+  } else if (a === "map-kind") {
+    const cur = stack[stack.length - 1].params || {};
+    const kind = act.getAttribute("data-kind");
+    replace("map", { ...cur, kind, level: kind === "bd" ? (cur.level || "div") : undefined });
+  } else if (a === "map-level") {
+    const cur = stack[stack.length - 1].params || {};
+    replace("map", { ...cur, level: act.getAttribute("data-level"), kind: "bd" });
   } else if (a === "explore-fav") {
     const cur = stack[stack.length - 1].params || {};
     replace("explore", { ...cur, fav: !cur.fav });
@@ -1627,4 +1806,4 @@ function boot() {
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { buildDailyQuestions, buildQuestionList, divQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges };
+export const __test = { buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges };

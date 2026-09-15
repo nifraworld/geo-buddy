@@ -6,6 +6,7 @@
 <script src="/geo-data.js"></script>
 <script src="/geo-flags.js"></script>
 <script src="/assets/bd-map-data.js"></script>
+<script src="/assets/bd-district-map-data.js"></script>
 <script src="/assets/world-map-data.js"></script>
 <link rel="stylesheet" href="/assets/style.css">
 </head>
@@ -26,6 +27,9 @@ const X = C.__test;
     ok(!!X, "missing __test export");
     ok(X.GEO.countries.length === 194, "country count");
     ok(X.GEO.divisions.length === 8, "division count");
+    ok(X.GEO.districts.length === 64, "district count");
+    ok(X.GEO.districts.every((d) => typeof d.upazilas === "number"), "district upazilas field");
+    ok(X.GEO.districts.every((d) => d.density > 0), "district density field");
     if (failed) throw new Error("early");
 
     X.newProfile("t");
@@ -37,6 +41,7 @@ const X = C.__test;
       () => { X.go("explore", {}); ok(/class="item"/.test(document.querySelector("#app").innerHTML), "explore"); },
 () => { X.go("detail", { kind: "div", id: "dhaka" }); ok(/Dhaka/.test(document.querySelector("#app").innerHTML), "dhaka"); },
       () => { X.go("detail", { kind: "c", id: "050" }); ok(document.querySelector("#app").innerHTML.length > 200, "country"); },
+      () => { X.go("detail", { kind: "z", id: "dhaka" }); ok(/Dhaka|ঢাকা/.test(document.querySelector("#app").innerHTML), "district detail"); },
       () => {
         const fav0 = X.isFav("c", "050");
         X.toggleFav("c", "050");
@@ -47,13 +52,14 @@ const X = C.__test;
         ok(row.some((h) => h.includes("Bangladesh")), "fav filter shows only favs");
       },
       () => { X.go("map"); ok(!!document.querySelector("#app canvas"), "map canvas"); },
+      () => { X.go("map", { kind: "bd", level: "dist" }); ok(!!document.querySelector("#app canvas"), "district map canvas"); ok(X.GEO.districts.length === 64, "district screen map"); },
       () => { X.render("play"); ok(/custom|daily/.test(document.querySelector("#app").innerHTML), "play hub"); },
       () => { X.render("custom"); ok(/bd|world-find/.test(document.querySelector("#app").innerHTML), "custom"); },
       () => { X.render("clock"); ok(/clock/.test(document.querySelector("#app").innerHTML), "clock"); },
       () => { X.render("daily"); ok(/play/i.test(document.querySelector("#app").innerHTML), "daily"); },
       () => { X.D.settings.pin = "1234"; X.go("pin"); X.render("parent"); ok(/Export|export|Backup|backup/.test(document.querySelector("#app").innerHTML), "parent"); },
     ];
-    const names = ["welcome", "home", "explore", "detail-d", "detail-c", "favs", "map", "play", "custom", "clock", "daily", "parent"];
+    const names = ["welcome", "home", "explore", "detail-d", "detail-c", "detail-z", "favs", "map", "map-dist", "play", "custom", "clock", "daily", "parent"];
     for (let i = 0; i < screens.length && !failed; i++) {
       try { screens[i](); } catch (e) { out.textContent = "HARNESS-FAIL (screen " + names[i] + "): " + e.message; document.title = "HARNESS-FAIL"; failed = true; }
     }
@@ -70,6 +76,19 @@ if (failed) { document.title = "HARNESS-FAIL"; } else {
       ok(X.getLevel(p) >= 2, "level advanced");
       const again = X.checkBadges(p);
       ok(again.length === 0, "badges not re-awarded");
+    }
+
+    // district question types
+    {
+      const dfind = X.buildQuestionList({ scope: "bd", types: ["d-find"], count: 5, adaptive: false });
+      ok(dfind.length === 5, "d-find questions");
+      ok(dfind.every((q) => q.map === "bd-d"), "d-find map kind");
+      const ddiv = X.buildQuestionList({ scope: "bd", types: ["d-div"], count: 5, adaptive: false });
+      ok(ddiv.length === 5, "d-div questions");
+      ok(ddiv.every((q) => q.choices && q.choices.length === 4), "d-div 4 choices");
+      const divd = X.buildQuestionList({ scope: "bd", types: ["div-d"], count: 5, adaptive: false });
+      ok(divd.length === 5, "div-d questions");
+      ok(divd.every((q) => q.choices && q.choices.length === 4), "div-d 4 choices");
     }
 
     // real session: click every question's first choice, let timers advance

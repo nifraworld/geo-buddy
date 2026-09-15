@@ -1,6 +1,6 @@
 # Geo Buddy — Bangladesh & World Geography for Kids
 
-Repository: `D:\GeoBuddy`  ·  Project: Geo Buddy  ·  Status: v1 build
+Repository: `D:\GeoBuddy`  ·  Project: Geo Buddy  ·  Status: v1.3 (districts) build
 
 An **offline-first PWA** (HTML/JS/CSS + service worker) that borrows the **structure
 and screens of Spelling Buddy** (`spelling.nifraworld.com`) and the **feature ideas of
@@ -55,7 +55,8 @@ geo.nifraworld.com root
 ├── geo-data.js           # GENERATED: divisions, countries, facts, flags
 ├── geo-flags.js          # GENERATED: flag SVG data-URIs (offline)
 ├── assets/
-│   ├── bd-map.svg + bd-map-data.js      # divisions map + geometry/labels
+│   ├── bd-map.svg + bd-map-data.js              # divisions map + geometry/labels
+│   ├── bd-district-map.svg + bd-district-map-data.js  # 64-district map (v1.3)
 │   ├── world-map.svg + world-map-data.js # world map (Natural Earth)
 │   ├── flags/*.svg                       # 194 bundled flags (offline)
 │   ├── icons/icon-{192,512,maskable-512}.png
@@ -75,8 +76,14 @@ geo.nifraworld.com root
 - **Phase 2** Quiz engine: modes, sessions, adaptive tracking, results, stars/streaks. ✅
 - **Phase 3** Parent zone + settings + backup + Toasts + haptics. ✅
 - **Phase 4** SW offline + manifest + icons (+ optional font bundling). ✅
-- **Phase 5** QA: data accuracy pass, offline audit, colour contrast, publish. 🔄
-  - In progress: automated checks (`npm test` = smoke + headless-Chrome UI harness).
+- **Phase 5** QA: data accuracy pass, offline audit, colour contrast, publish. ✅
+- **V1.1** World explorer: favourites, population/neighbours, region-bias questions. ✅
+- **V1.2** Sound effects & gamification: WebAudio SFX, badges, XP/levels, parent toggles. ✅
+- **V1.3** 64-district level for Bangladesh: district data (2022 census, normalised to
+  division totals), district SVG map (dissolved from upazilas), explore districts browse,
+  district quiz types (`d-div`, `div-d`, `d-find`), district detail screen, map level toggle. 🔄
+  - Remaining: visual QA of the district map (label density, tint contrast), a `districts` count line
+    on the Map tab, and audited Bangla district names.
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

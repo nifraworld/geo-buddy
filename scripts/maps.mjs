@@ -11,6 +11,7 @@ import * as turf from "@turf/turf";
 import { geoMercator, geoEquirectangular, geoPath } from "d3-geo";
 import simplify from "simplify-js";
 import { feature as topoFeature } from "topojson-client";
+import { DISTRICTS } from "./districts.mjs";
 
 const CACHE = new URL("../.cache/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const ASSETS = new URL("../assets/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
@@ -228,5 +229,171 @@ function worldBuild() {
   console.log("wrote world-map.svg + world-map-data.js");
 }
 
+/* ---------- Bangladesh districts ---------- */
+const DISTRICT_RENAME = {
+  "Chittagong": "Chattogram", "Barisal": "Barishal",
+};
+// Map official GeoJSON district_name -> slug id (must match districts.mjs)
+const DISTRICT_SLUG = {
+  "Bagerhat":"bagerhat","Bandarban":"bandarban","Barguna":"barguna","Barishal":"barishal",
+  "Bhola":"bhola","Bogura":"bogura","Brahmanbaria":"brahmanbaria","Chandpur":"chandpur",
+  "Chattogram":"chattogram","Chuadanga":"chuadanga","Cumilla":"cumilla",
+  "Cox's Bazar":"coxsbazar","Dhaka":"dhaka","Dinajpur":"dinajpur","Faridpur":"faridpur",
+  "Feni":"feni","Gaibandha":"gaibandha","Gazipur":"gazipur","Gopalganj":"gopalganj",
+  "Habiganj":"habiganj","Jaipurhat":"joypurhat","Jamalpur":"jamalpur","Jashore":"jashore",
+  "Jhalokati":"jhalokati","Jhenaidah":"jhenaidah","Khagrachari":"khagrachari",
+  "Khulna":"khulna","Kishoreganj":"kishoreganj","Kurigram":"kurigram","Kushtia":"kushtia",
+  "Lakshmipur":"lakshmipur","Lalmonirhat":"lalmonirhat","Madaripur":"madaripur",
+  "Magura":"magura","Manikganj":"manikganj","Maulvibazar":"maulvibazar",
+  "Meherpur":"meherpur","Munshiganj":"munshiganj","Mymensingh":"mymensingh",
+  "Naogaon":"naogaon","Narail":"narail","Narayanganj":"narayanganj",
+  "Narsingdi":"narsingdi","Natore":"natore","Netrokona":"netrokona",
+  "Nilphamari":"nilphamari","Noakhali":"noakhali","Pabna":"pabna","Panchagarh":"panchagarh",
+  "Patuakhali":"patuakhali","Pirojpur":"pirojpur","Rajbari":"rajbari","Rajshahi":"rajshahi",
+  "Rangamati":"rangamati","Rangpur":"rangpur","Satkhira":"satkhira",
+  "Shariatpur":"shariatpur","Sherpur":"sherpur","Sirajgonj":"sirajgonj",
+  "Sunamganj":"sunamganj","Sylhet":"sylhet","Tangail":"tangail",
+  "Thakurgaon":"thakurgaon","Nawabganj":"nawabganj",
+};
+function bdDistrictBuild() {
+  const fc = load("bd-upazilas.geojson");
+  const named = {}, unnamed = [];
+  for (const f of fc.features) {
+    const raw = String(f.properties.district_name || "").trim();
+    if (!raw) { unnamed.push(f); continue; }
+    const name = DISTRICT_RENAME[raw] || raw;
+    (named[name] ||= []).push(f);
+  }
+  const names = Object.keys(named).sort();
+  console.log("districts:", names.length, names.join(", "));
+
+  const dissolved = {};
+  for (const name of names) {
+    const start = Date.now();
+    dissolved[name] = dissolveDivision(named[name]);
+    console.log("  dissolve", name, "->", dissolved[name].length, "shape(s) in", ((Date.now() - start) / 1000).toFixed(1), "s");
+  }
+
+  // assign unnamed city polygons to nearest district
+  if (unnamed.length) {
+    const distFeat = Object.entries(dissolved).map(([n, feats]) => ({ n, feats }));
+    let assigned = 0;
+    for (const f of unnamed) {
+      const pt = turf.centroid({ type: "Feature", properties: {}, geometry: f.geometry });
+      let hit = distFeat.find((x) => x.feats.some((poly) => turf.booleanPointInPolygon(pt, poly)));
+      if (!hit) {
+        let best = null, bestD = Infinity;
+        for (const x of distFeat) {
+          for (const poly of x.feats) {
+            const d = turf.pointToPolygonDistance(pt, poly, { units: "kilometers" });
+            if (d < bestD) { bestD = d; best = x; }
+          }
+        }
+        hit = best;
+      }
+      if (hit) { (named[hit.n] ||= []).push(f); assigned++; }
+    }
+    console.log("assigned", assigned, "city polygons to districts");
+  }
+
+  // final dissolve + stamp district property
+  const allDist = [];
+  for (const name of names) {
+    const parts = dissolveDivision(named[name]);
+    for (const p of parts) { p.properties = { district: name }; allDist.push(p); }
+  }
+  const distFc = { type: "FeatureCollection", features: allDist };
+  writeFileSync(CACHE + "bd-districts-dissolved.json", JSON.stringify(distFc));
+  console.log("  dissolved FC:", allDist.length, "features,", (JSON.stringify(distFc).length / 1024).toFixed(0), "KB");
+
+  // topological simplification (1% keeps tighter boundaries for 64 districts)
+  execSync(
+    `node "${rootPath}\\node_modules\\mapshaper\\bin\\mapshaper" "${CACHE}bd-districts-dissolved.json" -simplify 1% keep-shapes -clean -o format=geojson "${CACHE}bd-districts-simplified.json"`,
+    { cwd: rootPath, stdio: ["ignore", "ignore", "pipe"] }
+  );
+  const simp = load("bd-districts-simplified.json");
+  console.log("  simplified:", simp.features.length, "features,", (JSON.stringify(simp).length / 1024).toFixed(0), "KB");
+
+  // reverse winding for d3 rendering (same as division build)
+  for (const f of simp.features) {
+    const c = f.geometry?.coordinates;
+    if (!c) continue;
+    const polygons = f.geometry.type === "Polygon" ? [c] : c;
+    for (const poly of polygons) for (const ring of poly) ring.reverse();
+  }
+
+  // group by district
+  const byDist = {};
+  for (const f of simp.features) {
+    const name = String(f.properties?.district || "").trim();
+    if (!name) continue;
+    (byDist[name] ||= []).push(f);
+  }
+
+  // project (use same extent as division map for consistent viewport)
+  const all = { type: "FeatureCollection", features: Object.values(byDist).flat() };
+  const proj = geoMercator().fitExtent([[6, 6], [634, 834]], all);
+  const paths = {};
+  const labels = {};
+  const gpath = geoPath(proj);
+  for (const name of Object.keys(byDist).sort()) {
+    const parts = [];
+    for (const f of byDist[name]) {
+      const g = f.geometry;
+      if (!g) continue;
+      if (g.type === "Polygon") parts.push(g.coordinates);
+      else if (g.type === "MultiPolygon") parts.push(...g.coordinates);
+    }
+    const full = { type: "MultiPolygon", coordinates: parts };
+    const d = gpath(full) || "";
+    const c = gpath.centroid(full) || gpath.bounds(full)[0];
+    const slug = DISTRICT_SLUG[name] || name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    paths[slug] = d;
+    labels[slug] = c ? [Math.round(c[0]), Math.round(c[1])] : [320, 420];
+  }
+
+  // district palette: per-division colour with light tint for each district inside
+  const divPalette = {
+    barishal:"#E9C46A", chattogram:"#2FA56A", dhaka:"#F49B1F",
+    khulna:"#2C6E8A", mymensingh:"#6A5ACD", rajshahi:"#C0392B",
+    rangpur:"#189AB4", sylhet:"#8D6E63",
+  };
+  // lightness offset per district within its division (0..5 shades)
+  const divCount = {};
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 840" width="640" height="840">\n`;
+  for (const slug of Object.keys(paths).sort()) {
+    if (!paths[slug]) continue;
+    // find division for this district (from districts.mjs data)
+    const drec = DISTRICTS.find((d) => d.id === slug);
+    const divId = drec ? drec.div : "";
+    const base = divPalette[divId] || "#DCEFD6";
+    // compute tint: each district within division gets slightly lighter
+    const idx = (divCount[divId] = (divCount[divId] || 0));
+    divCount[divId] = idx + 1;
+    const light = 1 - idx * 0.06;
+    const fill = adjustLightness(base, light);
+    svg += `  <path id="bd-${slug}" data-name="${slug}" d="${paths[slug]}" fill="${fill}" stroke="#0E3B2E" stroke-width="1.3" stroke-linejoin="round"/>\n`;
+  }
+  svg += `</svg>\n`;
+  writeFileSync(ASSETS + "bd-district-map.svg", svg);
+  writeFileSync(
+    ASSETS + "bd-district-map-data.js",
+    "/* GENERATED by scripts/maps.mjs. WGS84 upazila source dissolved into 64 districts. */\n" +
+      "var BD_MAP_D = " + JSON.stringify(paths, null, 1) + ";\n" +
+      "var BD_LABELS_D = " + JSON.stringify(labels, null, 1) + ";\n"
+  );
+  console.log("wrote bd-district-map.svg + bd-district-map-data.js");
+}
+
+// Simple hex color lightness adjustment: light=1 = original, <1 = lighter
+function adjustLightness(hex, light) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  const nr = Math.round(r + (255 - r) * (1 - light));
+  const ng = Math.round(g + (255 - g) * (1 - light));
+  const nb = Math.round(b + (255 - b) * (1 - light));
+  return `#${nr.toString(16).padStart(2,"0")}${ng.toString(16).padStart(2,"0")}${nb.toString(16).padStart(2,"0")}`;
+}
+
 bdBuild();
+bdDistrictBuild();
 worldBuild();

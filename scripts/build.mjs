@@ -49,6 +49,8 @@ const precacheFiles = [
   "/assets/style.css",
   "/assets/bd-map.svg",
   "/assets/bd-map-data.js",
+  "/assets/bd-district-map.svg",
+  "/assets/bd-district-map-data.js",
   "/assets/world-map.svg",
   "/assets/world-map-data.js",
   ...walk(path.join(ROOT, "assets", "icons"), "assets/icons").filter((f) => f.endsWith(".png")),

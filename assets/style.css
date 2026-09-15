@@ -132,7 +132,11 @@ h3{color:var(--green-2);}
 .native-txt{font-size:14px;color:var(--green-3);margin:4px 0 0;font-weight:700;}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px;}
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--cream);border:1px solid var(--line);
-  border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--green);}
+  border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--green);
+  font-family:inherit;cursor:pointer;}
+.chip.on{background:var(--green);color:#fff;border-color:var(--green);}
+.level-chips{justify-content:center;margin:8px 0 2px;}
+.level-chips .chip{padding:6px 14px;font-size:13px;}
 .chip-flag{width:20px;height:14px;object-fit:cover;border-radius:2px;}
 .wrong-list .qw{font-size:13px;color:var(--ink-soft);}
 .wrong-list .qa{font-size:14px;font-weight:700;color:var(--green);}
