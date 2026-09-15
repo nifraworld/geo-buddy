@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Geo Buddy — Bangladesh & world geography for kids, in English and Bangla. Free, works offline.">
+<meta name="theme-color" content="#0E3B2E">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<!-- Photos load from Wikimedia only while online -->
+<link rel="preconnect" href="https://upload.wikimedia.org">
+<link rel="preconnect" href="https://thumb.wikimedia.org">
+<link rel="stylesheet" href="assets/style.css">
+<title>Geo Buddy</title>
+</head>
+<body>
+<div id="app">
+  <div class="welcome">
+    <img class="hero" src="assets/icons/icon-512.png" alt="Geo Buddy">
+    <h1>Geo Buddy</h1>
+    <p class="tag">…</p>
+  </div>
+</div>
+<div id="toasts"></div>
+
+<!-- generated map data (classic globals: BD_MAP, BD_LABELS, WORLD_MAP, WORLD_LABELS) -->
+<script src="assets/bd-map-data.js"></script>
+<script src="assets/world-map-data.js"></script>
+<script type="module" src="src/engine.js"></script>
+</body>
+</html>

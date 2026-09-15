@@ -1,0 +1,30 @@
+{
+  "name": "geo-buddy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline-first geography PWA for Bangladeshi children (EN+BN). Build pipeline for maps, flags and country data.",
+  "scripts": {
+    "fetch": "node scripts/fetch.mjs",
+    "maps": "node scripts/maps.mjs",
+    "flags": "node scripts/flags.mjs",
+    "photos": "node scripts/photos.mjs",
+    "data": "node scripts/build-data.mjs",
+    "icons": "node scripts/icons.mjs",
+    "build": "node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "browsercheck": "node scripts/browser-check.mjs",
+    "test": "npm run smoke && npm run browsercheck",
+    "check": "node -e \"const {execSync}=require('child_process');for(const f of require('fs').readdirSync('scripts'))execSync('node --check scripts/'+f);execSync('node --check src/engine.js')\""
+  },
+  "devDependencies": {
+    "@turf/turf": "^7.2.0",
+    "d3-geo": "^3.1.1",
+    "flag-icons": "^7.5.0",
+    "mapshaper": "^0.7.61",
+    "sharp": "^0.35.4",
+    "simplify-js": "^1.2.4",
+    "topojson-client": "^3.1.0"
+  }
+}

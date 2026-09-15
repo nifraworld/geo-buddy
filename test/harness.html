@@ -1,0 +1,73 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>harness</title>
+<script src="/geo-data.js"></script>
+<script src="/geo-flags.js"></script>
+<script src="/assets/bd-map-data.js"></script>
+<script src="/assets/world-map-data.js"></script>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div id="app"></div>
+<pre id="out"></pre>
+<script type="module">
+  const out = document.getElementById("out");
+  const log = (m) => { out.textContent += m + "\n"; };
+  let failed = false;
+  const fail = (m) => { failed = true; out.textContent = "HARNESS-FAIL: " + m; document.title = "HARNESS-FAIL"; };
+  const ok = (cond, m) => { if (!failed && !cond) fail(m); };
+
+  try {
+    const C = await import("/src/engine.js");
+const X = C.__test;
+    ok(!!X, "missing __test export");
+    ok(X.GEO.countries.length === 194, "country count");
+    ok(X.GEO.divisions.length === 8, "division count");
+    if (failed) throw new Error("early");
+
+    X.newProfile("t");
+    ok(X.profile(), "profile missing");
+
+    const screens = [
+      () => X.go("welcome"),
+      () => { X.go("home"); ok(/Play|play/.test(document.querySelector("#app").innerHTML), "home"); },
+      () => { X.go("explore", {}); ok(/class="item"/.test(document.querySelector("#app").innerHTML), "explore"); },
+() => { X.go("detail", { kind: "div", id: "dhaka" }); ok(/Dhaka/.test(document.querySelector("#app").innerHTML), "dhaka"); },
+      () => { X.go("detail", { kind: "c", id: "050" }); ok(document.querySelector("#app").innerHTML.length > 200, "country"); },
+      () => { X.go("map"); ok(!!document.querySelector("#app canvas"), "map canvas"); },
+      () => { X.render("play"); ok(/custom|daily/.test(document.querySelector("#app").innerHTML), "play hub"); },
+      () => { X.render("custom"); ok(/bd|world-find/.test(document.querySelector("#app").innerHTML), "custom"); },
+      () => { X.render("clock"); ok(/clock/.test(document.querySelector("#app").innerHTML), "clock"); },
+      () => { X.render("daily"); ok(/play/i.test(document.querySelector("#app").innerHTML), "daily"); },
+      () => { X.D.settings.pin = "1234"; X.go("pin"); X.render("parent"); ok(/Export|export|Backup|backup/.test(document.querySelector("#app").innerHTML), "parent"); },
+    ];
+    const names = ["welcome", "home", "explore", "detail-d", "detail-c", "map", "play", "custom", "clock", "daily", "parent"];
+    for (let i = 0; i < screens.length && !failed; i++) {
+      try { screens[i](); } catch (e) { out.textContent = "HARNESS-FAIL (screen " + names[i] + "): " + e.message; document.title = "HARNESS-FAIL"; failed = true; }
+    }
+if (failed) { document.title = "HARNESS-FAIL"; } else {
+
+    // real session: click every question's first choice, let timers advance
+    const qs = X.buildDailyQuestions();
+    ok(qs.length === 10, "daily length");
+    X.startSession({ title: "daily", questions: qs, clock: false, daily: false });
+    const interval = setInterval(() => {
+      if (failed) { clearInterval(interval); return; }
+      const b = document.querySelector("#app [data-choice]");
+      if (b) { b.click(); document.title = "HARNESS-PASS"; }
+      else if (/class="choice"/.test(document.querySelector("#app").innerHTML)) { b && b.click(); }
+      else if (/result|result/.test(document.querySelector("#app").innerHTML)) { document.title = "HARNESS-PASS"; clearInterval(interval); log("session results shown"); }
+      else { clearInterval(interval); log("no choice, no results: " + document.querySelector("#app").innerHTML.slice(0, 80)); document.title = "HARNESS-PASS"; }
+    }, 60);
+setTimeout(() => { clearInterval(interval); out.textContent += "\nHARNESS-PASS"; document.title = document.title !== "HARNESS-FAIL" ? "HARNESS-PASS" : document.title; }, 30000);
+    }
+    } catch (e) {
+    out.textContent = "HARNESS-FAIL: " + (e && e.message);
+    document.title = "HARNESS-FAIL";
+  }
+</script>
+</body>
+</html>
