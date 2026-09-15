@@ -112,6 +112,9 @@ const L = {
     dataSources: "Facts: mledoze/countries (ODbL) · Flags: lipis/flag-icons (MIT) · Photos: Wikimedia Commons · Bangladesh census: BBS 2022.",
     made: "Made with ❤ for curious kids.",
     wrongList: "Review what you missed:", tryAgainBtn: "Practise mistakes",
+    soundEff: "Sound effects", soundEffSub: "Correct, wrong & celebration sounds",
+    badgeTitle: "Badges", badgeNone: "Complete quizzes to earn badges!",
+    level: "Level",
   },
   bn: {
     brand: "জিও বাডি", brandSub: "বাংলাদেশ • বিশ্ব",
@@ -189,6 +192,9 @@ const L = {
     dataSources: "তথ্য: mledoze/countries (ODbL) · পতাকা: lipis/flag-icons (MIT) · ছবি: উইকিমিডিয়া কমন্স · আদমশুমারি: বিবিএস ২০২২।",
     made: "জিজ্ঞাসু বাচ্চাদের জন্য ভালোবাসা দিয়ে তৈরি।",
     wrongList: "ভুলগুলো আবার দেখে নিই:", tryAgainBtn: "ভুলগুলো অনুশীলন করি",
+    soundEff: "সাউন্ড ইফেক্ট", soundEffSub: "সঠিক, ভুল ও উল্লাসের সাউন্ড",
+    badgeTitle: "ব্যাজ", badgeNone: "কুইজ সম্পন্ন করে ব্যাজ অর্জন করো!",
+    level: "স্তর",
   },
 };
 let _lang = "en";
@@ -204,9 +210,9 @@ const DB_KEY = "geobuddy.v1";
 let D = null;
 function defaultStore() {
   return {
-    v: 1, lang: "en", active: null,
+    v: 2, lang: "en", active: null,
     profiles: {},
-    settings: { pin: "", lockLang: false },
+    settings: { pin: "", lockLang: false, soundEnabled: true },
   };
 }
 function load() {
@@ -215,6 +221,9 @@ function load() {
     D = raw ? JSON.parse(raw) : defaultStore();
   } catch { D = defaultStore(); }
   if (!D.profiles) D.profiles = {};
+  if (!D.settings) D.settings = {};
+  if (D.settings.soundEnabled === undefined) D.settings.soundEnabled = true;
+  soundOn = D.settings.soundEnabled;
   const active = D.active && D.profiles[D.active] ? D.active : null;
   _lang = D.lang === "bn" ? "bn" : "en";
   if (active) D.active = active;
@@ -298,7 +307,74 @@ function todayKey() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
-let soundOn = true; // simple tap feedback; toggled nowhere in v1 (kept for future)
+let soundOn = true;
+let _audioCtx = null;
+function getAudio() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_audioCtx.state === "suspended") _audioCtx.resume();
+  return _audioCtx;
+}
+function sfx(type) {
+  if (!soundOn || !D.settings || !D.settings.soundEnabled) return;
+  try {
+    const ctx = getAudio();
+    const now = ctx.currentTime;
+    const play = (freq, start, dur, wave = "sine", gain = 0.18) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = wave;
+      o.frequency.setValueAtTime(freq, now + start);
+      g.gain.setValueAtTime(gain, now + start);
+      g.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(now + start);
+      o.stop(now + start + dur);
+    };
+    switch (type) {
+      case "correct":  play(660, 0, 0.1); play(880, 0.1, 0.15); break;
+      case "wrong":    play(400, 0, 0.12, "sawtooth", 0.1); play(260, 0.12, 0.18, "sawtooth", 0.08); break;
+      case "finish":   play(523, 0, 0.12); play(659, 0.12, 0.12); play(784, 0.24, 0.2); break;
+      case "levelUp":  play(523, 0, 0.08); play(659, 0.08, 0.08); play(784, 0.16, 0.08); play(1047, 0.24, 0.25); break;
+      case "badge":    play(784, 0, 0.1); play(988, 0.1, 0.1); play(1175, 0.2, 0.1); play(1568, 0.3, 0.3); break;
+      case "streak":   play(600, 0, 0.08); play(800, 0.08, 0.08); play(1000, 0.16, 0.15); break;
+      case "tap":      play(880, 0, 0.05, "sine", 0.08); break;
+    }
+  } catch {}
+}
+function sfxInit() { try { getAudio(); } catch {} }
+
+/* ================= badges & levels ================= */
+const BADGES = [
+  { id: "first-play",   icon: "🎯",  en: "First Shot",       bn: "প্রথম প্রয়াস",  descEn: "Complete your first quiz",                descBn: "প্রথম কুইজ সম্পন্ন করো",               test: (p) => p.stats.asked >= 1 },
+  { id: "perfect-10",   icon: "💯",  en: "Perfect!",         bn: "দারুণ!",         descEn: "Get 10/10 in a quiz",                     descBn: "কুইজে ১০/১০ পাও",                      test: (p) => p._best10 },
+  { id: "streak-3",     icon: "🔥",  en: "Streak Keeper",    bn: "ধারাবাহিক",      descEn: "3-day streak",                            descBn: "৩ দিনের ধারা",                          test: (p) => (p.daily.streak || 0) >= 3 },
+  { id: "streak-7",     icon: "🌋",  en: "Unstoppable",       bn: "অবরোধ্য",       descEn: "7-day streak",                            descBn: "৭ দিনের ধারা",                          test: (p) => (p.daily.streak || 0) >= 7 },
+  { id: "flag-master",  icon: "🏁",  en: "Flag Master",      bn: "পতাকা মাস্টার",  descEn: "100% on a flag quiz",                     descBn: "পতাকা কুইজে ১০০%",                      test: (p) => !!p._flagMaster },
+  { id: "map-master",   icon: "🗺️",  en: "Map Master",       bn: "মানচিত্র মাস্টার",descEn: "100% on a find-on-map quiz",               descBn: "মানচিত্র কুইজে ১০০%",                    test: (p) => !!p._mapMaster },
+  { id: "century",      icon: "💯",  en: "Century Club",     bn: "শতক",            descEn: "Answer 100 questions total",               descBn: "১০০টি প্রশ্নের উত্তর দাও",               test: (p) => p.stats.asked >= 100 },
+  { id: "star-30",      icon: "⭐",  en: "Star Collector",   bn: "তারা সংগ্রাহক",  descEn: "Earn 30 total stars",                     descBn: "৩০টি তারা অর্জন করো",                    test: (p) => totalStars(p) >= 30 },
+  { id: "star-100",     icon: "🌟",  en: "Constellation",    bn: "তারামণ্ডল",      descEn: "Earn 100 total stars",                    descBn: "১০০টি তারা অর্জন করো",                   test: (p) => totalStars(p) >= 100 },
+  { id: "explorer-20",  icon: "🌍",  en: "World Explorer",   bn: "বিশ্ব অনুসন্ধানী",descEn: "Favourite 20 countries",                  descBn: "২০টি দেশ পছন্দের তালিকায় যোগ করো",     test: (p) => countFavs(p, "c") >= 20 },
+];
+function totalStars(p) { return Object.values(p.stars || {}).reduce((s, v) => s + v, 0); }
+function countFavs(p, kind) {
+  return Object.keys(p.favs || {}).filter((k) => k.startsWith(kind + "|")).length;
+}
+function checkBadges(p) {
+  if (!p.badges) p.badges = {};
+  const newBadges = [];
+  for (const b of BADGES) {
+    if (!p.badges[b.id] && b.test(p)) {
+      p.badges[b.id] = Date.now();
+      newBadges.push(b);
+    }
+  }
+  return newBadges;
+}
+function getXP(p) { return (p.stats.correct || 0) * 10; }
+function getLevel(p) { const xp = getXP(p); let lv = 1; while (xp >= lv * lv * 50) lv++; return lv; }
+function xpForNext(p) { const lv = getLevel(p); return lv * lv * 50; }
 
 /* ================= feedback ================= */
 function toast(msg) {
@@ -356,7 +432,7 @@ function replace(name, params) {
 function fillTopbar(homeable) {
   const act = profile();
   const child = act
-    ? `<button class="chip-child" data-nav="who" title="${t("profile")}"><span class="av" style="background:${act.avatar.color}">${act.avatar.icon}</span><span class="nm">${act.name.split(" ")[0]}</span></button>`
+    ? `<button class="chip-child" data-nav="who" title="${t("profile")}"><span class="av" style="background:${act.avatar.color}">${act.avatar.icon}</span><span class="nm">${act.name.split(" ")[0]}</span><span class="lv" title="${t("level")}">Lv${getLevel(act)}</span></button>`
     : "";
   const lock = D.settings.lockLang;
   return `<header class="topbar">
@@ -407,7 +483,7 @@ function screenWelcome() {
         <button class="btn btn-primary" data-action="picklang" data-lang="en">English</button>
         <button class="btn btn-primary" data-action="picklang" data-lang="bn">বাংলা</button>
       </div>
-      <button class="btn btn-sun" data-nav="who">${t("welcome.start")} ➜</button>
+      <button class="btn btn-sun" data-nav="who" onclick="sfx('tap')">${t("welcome.start")} ➜</button>
     </section>`);
 }
 MOUNT.welcome = () => {
@@ -964,6 +1040,7 @@ function answerSession(s, q, pick, spot, correctId) {
     save();
   }
   applyFeedback(q, ok, pick, spot);
+  if (ok) sfx("correct"); else sfx("wrong");
   if (S.conf.clock && ok) { stopClockForNiceMoment(); }
   setTimeout(() => { s.idx++; showNext(S); }, ok ? 950 : 1800);
 }
@@ -1034,12 +1111,30 @@ function finish() {
       const yk = y.getFullYear() + "-" + String(y.getMonth() + 1).padStart(2, "0") + "-" + String(y.getDate()).padStart(2, "0");
       p.daily.streak = p.daily.last === yk ? (p.daily.streak || 0) + 1 : 1;
       p.daily.last = tk;
+      if (p.daily.streak > 1) sfx("streak");
     }
   }
-  // capture for results
   const result = { pct, stars, correct: s.correct, total, wrong: s.wrong.slice(0, 8), daily: s.conf.daily, best: p.best || 0 };
+  const hasMapFind = s.conf.questions.some((q) => q.kind === "map");
+  const hasFlag = s.conf.questions.some((q) => q.kind === "flag");
+  if (hasFlag && pct === 100) p._flagMaster = true;
+  if (hasMapFind && pct === 100) p._mapMaster = true;
+  if (pct === 100 && total >= 10) p._best10 = true;
+  const oldLv = getLevel(p);
   save();
   if (stars >= 2) confetti();
+  sfx("finish");
+  const newBadges = checkBadges(p);
+  if (newBadges.length) {
+    setTimeout(() => {
+      for (const b of newBadges) { sfx("badge"); toast(`${b.icon} ${b.en} — ${_lang === "bn" ? b.descBn : b.descEn}`); }
+      confetti();
+    }, 1400);
+  }
+  const newLv = getLevel(p);
+  if (newLv > oldLv) {
+    setTimeout(() => { sfx("levelUp"); toast(`⬆️ Level ${newLv}!`); confetti(); }, newBadges.length ? 2800 : 600);
+  }
   if (result.wrong.length === total) speak(t("wrong"), _lang);
   replace("results", result);
 }
@@ -1364,6 +1459,10 @@ function screenParent() {
     <div class="card">
       <h3>${t("settings")}</h3>
       <div class="setting">
+        <span><span class="tt">🔊 ${t("soundEff")}</span><br><span class="ds">${t("soundEffSub")}</span></span>
+        <button class="switch ${D.settings.soundEnabled ? "on" : ""}" data-action="p-sound"></button>
+      </div>
+      <div class="setting">
         <span><span class="tt">${t("langLock")}</span><br><span class="ds">${t("langLockSub")}</span></span>
         <button class="switch ${D.settings.lockLang ? "on" : ""}" data-action="p-lock"></button>
       </div>
@@ -1377,6 +1476,17 @@ function screenParent() {
       </div>
     </div>
     <div class="card">
+      <h3>🏅 ${t("badgeTitle")}</h3>
+      <div class="badge-grid" style="margin-top:10px">
+        ${Object.keys(p.badges || {}).length
+          ? Object.entries(p.badges).map(([bid]) => {
+              const b = BADGES.find((x) => x.id === bid);
+              return b ? `<span class="badge-sec" title="${b.descEn}">${b.icon} ${_lang === "bn" ? b.bn : b.en}</span>` : "";
+            }).join("")
+          : `<span style="font-size:14px;color:var(--muted)">${t("badgeNone")}</span>`}
+      </div>
+    </div>
+    <div class="card">
       <h3>${t("profileStats")}</h3>
       ${Object.values(D.profiles).map((p2) => `
         <div class="setting" style="border:none">
@@ -1387,6 +1497,7 @@ function screenParent() {
     </div>`);
 }
 MOUNT.parent = (params) => {
+  bindAction(APP, "p-sound", (e) => { D.settings.soundEnabled = !D.settings.soundEnabled; soundOn = D.settings.soundEnabled; save(); if (soundOn) sfx("tap"); render("parent"); });
   bindAction(APP, "p-lock", (e) => { D.settings.lockLang = !D.settings.lockLang; save(); render("parent"); });
   bindAction(APP, "p-clear", (e) => {
     if (!confirm(t("confirmClear"))) return;
@@ -1516,4 +1627,4 @@ function boot() {
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { buildDailyQuestions, buildQuestionList, divQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id) };
+export const __test = { buildDailyQuestions, buildQuestionList, divQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges };

@@ -59,6 +59,19 @@ const X = C.__test;
     }
 if (failed) { document.title = "HARNESS-FAIL"; } else {
 
+    // badges & levels
+    {
+      const p = X.profile();
+      ok(X.getLevel(p) === 1, "fresh level 1");
+      p.stats.asked = 1; p.stats.correct = 30; p.daily.streak = 7;
+      const won = X.checkBadges(p);
+      ok(won.some((b) => b.id === "first-play"), "first-play badge");
+      ok(won.some((b) => b.id === "streak-7"), "streak-7 badge");
+      ok(X.getLevel(p) >= 2, "level advanced");
+      const again = X.checkBadges(p);
+      ok(again.length === 0, "badges not re-awarded");
+    }
+
     // real session: click every question's first choice, let timers advance
     const qs = X.buildDailyQuestions();
     ok(qs.length === 10, "daily length");
