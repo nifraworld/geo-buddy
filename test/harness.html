@@ -91,6 +91,18 @@ if (failed) { document.title = "HARNESS-FAIL"; } else {
       ok(divd.every((q) => q.choices && q.choices.length === 4), "div-d 4 choices");
     }
 
+    // licence + branding
+    {
+      const htmlState = document.querySelector("#app").innerHTML;
+      ok(htmlState.indexOf("geobuddy.nifraworld.com") >= 0, "site tag rendered on parent");
+      ok(htmlState.indexOf("v" + X.GEO.version) >= 0, "version rendered on parent");
+      ok(/Licence|লাইসেন্স/.test(htmlState), "licence card on parent");
+      ok(X.deviceId().startsWith("gb-"), "device id format");
+      ok(X.hasScope("bd") && X.hasScope("wr"), "hasScope true while unlocked");
+      X.clearLicence();
+      ok(!X.licence().key, "clearLicence resets");
+    }
+
     // real session: click every question's first choice, let timers advance
     const qs = X.buildDailyQuestions();
     ok(qs.length === 10, "daily length");

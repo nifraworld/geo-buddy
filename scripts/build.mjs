@@ -90,6 +90,8 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+  const u = new URL(e.request.url);
+  if (u.origin === self.location.origin && u.pathname.indexOf("/api/") === 0) return;
   e.respondWith(
     caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
       if (!res.ok || res.type !== "basic") return res;

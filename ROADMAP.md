@@ -1,6 +1,6 @@
 # Geo Buddy — Bangladesh & World Geography for Kids
 
-Repository: `D:\GeoBuddy`  ·  Project: Geo Buddy  ·  Status: v1.3 (districts) build
+Repository: `D:\GeoBuddy`  ·  Project: Geo Buddy  ·  Status: v1.4 (licence + branding) build
 
 An **offline-first PWA** (HTML/JS/CSS + service worker) that borrows the **structure
 and screens of Spelling Buddy** (`spelling.nifraworld.com`) and the **feature ideas of
@@ -17,7 +17,7 @@ geopoto** (adaptive training, daily challenge, encyclopedia, map explorer).
 - **Per-child profiles** on-device with stars, streaks, history (like Spelling Buddy).
 - **Parent zone** behind a 4-digit PIN: profiles, progress, settings, backup/export,
   WhatsApp share, About/sources.
-- **No licence/activation in v1.**
+- **No licence/activation in v1** — superseded by **V1.4** (prep-for-sale licence).
 - **Photos:** Wikimedia Commons URLs only; `<img>` loaded lazily and only when online;
   elegant placeholder offline.
 - **Audio:** phone TTS (speechSynthesis) reads place names in English and Bangla.
@@ -81,9 +81,20 @@ geo.nifraworld.com root
 - **V1.2** Sound effects & gamification: WebAudio SFX, badges, XP/levels, parent toggles. ✅
 - **V1.3** 64-district level for Bangladesh: district data (2022 census, normalised to
   division totals), district SVG map (dissolved from upazilas), explore districts browse,
-  district quiz types (`d-div`, `div-d`, `d-find`), district detail screen, map level toggle. 🔄
-  - Remaining: visual QA of the district map (label density, tint contrast), a `districts` count line
-    on the Map tab, and audited Bangla district names.
+  district quiz types (`d-div`, `div-d`, `d-find`), district detail screen, map level toggle. ✅
+  - Follow-ups (parked): visual QA of the district map (label density, tint contrast), a
+    `districts` count line on the Map tab, audited Bangla district names.
+- **V1.4** Pre-sale branding + licence/key system (mirrors Spelling Buddy). ✅
+  - `geobuddy.nifraworld.com` + app version pinned top-right on every screen.
+  - Server-side key formula (`functions/`, env `LICENCE_SECRET`) + private key generator
+    (`admin-tools/`, git-ignored). Keys: `GB-XXXX-XXXX` (bundle) / `GB-BD-`·`GB-WR-`;
+    teacher code `TP-XXXX-XXXX`.
+  - Pages Functions: `/api/activate`, `/api/licence`, `/api/keys` (gated by `REVIEW_KEY`),
+    D1 schema (`plans`, `devices`), `SETUP.md`, `licences.json` manifest.
+  - Parent-zone "Licence" card (activate/remove), status shown, offline refresh on launch.
+  - App currently runs fully open (`APP_LOCKED = false`); flipping it starts enforcing keys.
+  - Remaining (when selling starts): D1 + secrets in Cloudflare (dashboard steps in
+    `functions/SETUP.md`), then flip `APP_LOCKED`.
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

@@ -128,6 +128,14 @@ const L = {
     levelDivisions: "Divisions", levelDistricts: "Districts",
     inDivision: "In {X}", district: "District", districts_: "districts",
     density: "Density", districtPractise: "Practice the district {d} — it is in the {dv} division.",
+    licence: "Licence", licenceSub: "Activate a Geo Buddy key (optional)",
+    licEmail: "Buyer email", licKey: "Activation key", licActivate: "Activate", licRemove: "Remove key",
+    licOpen: "App is fully open", licNoKey: "No key yet",
+    licFull: "Bundled licence active", licScope: "Content licence active",
+    licRevoked: "This key was revoked.", licRemoved: "Key removed",
+    licErrFields: "Enter an email and a key.", licErrNetwork: "Couldn't reach the licence server — try again online.",
+    licErrMatch: "That email + key don't match.", licPlan: "Plan: {plan}", licOffline: "Offline — using the last checked status.",
+    licDevices: "{n} of {limit} devices",
   },
   bn: {
     brand: "জিও বাডি", brandSub: "বাংলাদেশ • বিশ্ব",
@@ -214,6 +222,14 @@ const L = {
     levelDivisions: "বিভাগ", levelDistricts: "জেলা",
     inDivision: "{X} বিভাগে", district: "জেলা", districts_: "টি জেলা",
     density: "ঘনত্ব", districtPractise: "{dv} বিভাগের মধ্যে {d} জেলাটি চর্চা করো।",
+    licence: "লাইসেন্স", licenceSub: "জিও বাডি কী সক্রিয় করো (ঐচ্ছিক)",
+    licEmail: "ক্রেতার ইমেইল", licKey: "অ্যাক্টিভেশন কী", licActivate: "সক্রিয় করো", licRemove: "কী মুছো",
+    licOpen: "অ্যাপ সম্পূর্ণ খোলা", licNoKey: "এখনো কী নেই",
+    licFull: "বান্ডেল লাইসেন্স সক্রিয়", licScope: "কনটেন্ট লাইসেন্স সক্রিয়",
+    licRevoked: "এই কী বাতিল করা হয়েছে।", licRemoved: "কী মুছে ফেলা হয়েছে",
+    licErrFields: "ইমেইল ও কী দাও।", licErrNetwork: "লাইসেন্স সার্ভারে পৌঁছানো গেল না — অনলাইনে আবার চেষ্টা করো।",
+    licErrMatch: "ইমেইল + কী মিলছে না।", licPlan: "প্ল্যান: {plan}", licOffline: "অফলাইন — শেষ জানা অবস্থা ব্যবহার হচ্ছে।",
+    licDevices: "{n}/{limit}টি ডিভাইস",
   },
 };
 let _lang = "en";
@@ -277,6 +293,93 @@ function toggleFav(p, type, id) {
   if (!v) delete p.favs[k];
   save();
   return v;
+}
+
+/* ================= licence (activation key) =================
+   Mirrors the Spelling Buddy scheme: the key formula lives server-side
+   (functions/, env LICENCE_SECRET), so it is never shipped to the phone.
+   Right now the whole app is open; when sales start, set APP_LOCKED = true
+   and only activated keys unlock content. */
+const LICENCE_SCOPES = ["bd", "wr"];
+let APP_LOCKED = false;
+
+function deviceId() {
+  if (!D.settings.deviceId)
+    D.settings.deviceId = "gb-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-6);
+  save();
+  return D.settings.deviceId;
+}
+function licence() {
+  if (!D.settings.licence)
+    D.settings.licence = { email: "", key: "", status: "free", plan: "Home", packages: [], deviceLimit: 0, deviceCount: 0, checkedAt: 0 };
+  return D.settings.licence;
+}
+function licenceLabel() {
+  const l = licence();
+  if (!APP_LOCKED) return t("licOpen");
+  if (!l.key) return t("licNoKey");
+  if (l.status === "revoked") return t("licRevoked");
+  if (l.status === "full" || l.status === "grace") return l.packages.includes("bundle") ? t("licFull") : t("licScope");
+  return t("licNoKey");
+}
+function hasScope(scope) {
+  if (!APP_LOCKED) return true;
+  const l = licence();
+  if (!l.key || l.status === "revoked") return false;
+  if (l.status === "full") return true;
+  return (l.packages || []).includes("bundle") || (l.packages || []).includes(scope) || !LICENCE_SCOPES.includes(scope);
+}
+async function activateLicence(email, key) {
+  const e = String(email || "").trim().toLowerCase();
+  const k = String(key || "").trim();
+  if (!e || e.indexOf("@") < 0 || !k) return { ok: false, error: "fields" };
+  let r;
+  try {
+    const res = await fetch("/api/activate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: e, key: k, device: deviceId(), appVersion: GEO.version || "", bot: false }),
+    });
+    r = res.ok ? await res.json() : { ok: false, error: "http " + res.status };
+  } catch { return { ok: false, error: "network" }; }
+  if (r.ok) {
+    const l = licence();
+    l.email = e; l.key = k;
+    l.packages = r.packages || [];
+    l.plan = r.plan || "Home";
+    l.deviceLimit = r.deviceLimit || 0;
+    l.deviceCount = r.deviceCount || 0;
+    l.status = "full";
+    l.checkedAt = Date.now();
+    save();
+  }
+  return r;
+}
+async function refreshLicence(silent) {
+  const l = licence();
+  if (!l.key) return;
+  if (!navigator.onLine) { if (!silent) toast(t("licOffline")); return; }
+  const url = "/api/licence?email=" + encodeURIComponent(l.email) + "&device=" + encodeURIComponent(deviceId()) +
+    "&ak=" + encodeURIComponent(l.key) + "&tc=";
+  try {
+    const res = await fetch(url, { cache: "no-store", headers: { "cache-control": "no-cache" } });
+    const r = res.ok ? await res.json() : null;
+    if (r && r.ok) {
+      l.status = r.status || l.status;
+      l.plan = r.plan || l.plan;
+      l.deviceLimit = r.deviceLimit || 0;
+      l.deviceCount = r.deviceCount || 0;
+      const akPkg = r.akValid ? (r.packages || []).filter((x) => x === "bundle" || x === "bd" || x === "wr") : [];
+      if (akPkg.length) l.packages = akPkg;
+      if (r.revoked) l.status = "revoked";
+      l.checkedAt = Date.now();
+      save();
+    }
+  } catch { if (!silent) toast(t("licOffline")); }
+}
+function clearLicence() {
+  D.settings.licence = { email: "", key: "", status: "free", plan: "Home", packages: [], deviceLimit: 0, deviceCount: 0, checkedAt: Date.now() };
+  save();
 }
 function bumpItem(p, type, id, correct) {
   const k = itemKey(type, id);
@@ -449,6 +552,10 @@ function replace(name, params) {
   render(name, params);
 }
 
+function siteTag() {
+  return `<span class="site-tag"><b>geobuddy.nifraworld.com</b><small>v${GEO.version || ""}</small></span>`;
+}
+
 function fillTopbar(homeable) {
   const act = profile();
   const child = act
@@ -462,6 +569,7 @@ function fillTopbar(homeable) {
       <span><h1>Geo Buddy</h1><small>${t("brandSub")}</small></span>
     </a>
     ${homeable ? child : ""}
+    ${siteTag()}
     ${lock ? "" : `<button class="tb-btn" data-tb="lang">${t("langSwitch")}</button>`}
   </header>`;
 }
@@ -481,7 +589,7 @@ function render(name, params) {
     daily: screenDaily, parent: screenParent, pin: screenPin, about: screenAbout,
     custom: screenCustom, clock: screenClock,
   }[name];
-  const top = name === "welcome" || name === "pin" ? "" : fillTopbar(name !== "who");
+  const top = name === "welcome" || name === "pin" ? `<div class="site-tag-float">${siteTag()}</div>` : fillTopbar(name !== "who");
   document.title = name === "map" ? "Map — Geo Buddy" : "Geo Buddy";
   const node = sub(params);
   APP.innerHTML = top + htmlStr(node);
@@ -1619,6 +1727,24 @@ MOUNT.pin = (params = {}) => {
   }
   paintDots();
 };
+function licCard() {
+  const l = licence();
+  const has = !!l.key;
+  return `
+    <div class="card">
+      <h3>🔑 ${t("licence")}</h3>
+      <p class="ds" style="margin-top:6px">${t("licenceSub")}</p>
+      <div class="setting" style="border:none;margin-top:8px">
+        <span><span class="tt">${licenceLabel()}</span>
+        ${has ? `<br><span class="ds">${l.email}${l.deviceLimit ? ` · ${tvar("licDevices", { n: l.deviceCount || 0, limit: l.deviceLimit })}` : ""}</span>` : ""}</span>
+        ${has ? `<button class="btn btn-mini" style="background:var(--cream);color:var(--bad)" data-action="p-lic-remove">${t("licRemove")}</button>` : ""}
+      </div>
+      ${has ? "" : `
+      <input id="lic-email" class="lic-inp" inputmode="email" autocomplete="email" placeholder="${t("licEmail")}">
+      <input id="lic-key" class="lic-inp" spellcheck="false" autocomplete="off" placeholder="${t("licKey")} — GB-XXXX-XXXX" style="margin-top:8px">
+      <button class="btn btn-sun btn-small" style="margin-top:10px;padding:12px" data-action="p-lic-activate">🔑 ${t("licActivate")}</button>`}
+    </div>`;
+}
 function screenParent() {
   const p = profile();
   return html(`
@@ -1642,6 +1768,7 @@ function screenParent() {
         <button class="btn btn-paper" data-nav="about">ℹ️ ${t("about")}</button>
       </div>
     </div>
+    ${licCard()}
     <div class="card">
       <h3>🏅 ${t("badgeTitle")}</h3>
       <div class="badge-grid" style="margin-top:10px">
@@ -1689,6 +1816,26 @@ MOUNT.parent = (params) => {
     save();
     render("parent");
     toast(t("justDeleted"));
+  });
+  bindAction(APP, "p-lic-activate", async (e, btn) => {
+    const email = (APP.querySelector("#lic-email") || {}).value || "";
+    const key = (APP.querySelector("#lic-key") || {}).value || "";
+    btn.disabled = true;
+    const r = await activateLicence(email, key);
+    if (r && r.ok) {
+      save();
+      render("parent");
+      toast(t("licActivated"));
+    } else {
+      btn.disabled = false;
+      const err = r && r.error;
+      toast(err === "network" ? t("licErrNetwork") : (err === "no match" ? t("licErrMatch") : t("licErrFields")));
+    }
+  });
+  bindAction(APP, "p-lic-remove", () => {
+    clearLicence();
+    render("parent");
+    toast(t("licRemoved"));
   });
 };
 function screenAbout() {
@@ -1798,6 +1945,7 @@ document.addEventListener("click", (e) => {
 /* ================= boot ================= */
 function boot() {
   load();
+  if (licence().key) refreshLicence(true);
   go("welcome");
   if ("serviceWorker" in navigator && navigator.serviceWorker && location.protocol.startsWith("http")) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -1806,4 +1954,4 @@ function boot() {
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges };
+export const __test = { buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED };

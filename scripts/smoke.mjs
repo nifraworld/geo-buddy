@@ -112,5 +112,14 @@ for (const ty of ["bd-hq", "bd-fact", "bd-find"]) {
 const list = T.buildQuestionList({ scope: "both", types: ["wf", "hc", "bd-find"], count: 12, adaptive: false });
 assert(list.length === 12, "custom 12");
 
+// licence helpers
+const did = T.deviceId();
+assert(did && did.startsWith("gb-"), "deviceId stable format");
+assert(T.deviceId() === did, "deviceId stable across calls");
+assert(T.hasScope("bd") && T.hasScope("wr"), "hasScope true while unlocked");
+assert(typeof T.licenceLabel() === "string" && T.licenceLabel().length > 0, "licenceLabel returns text");
+assert(Array.isArray(T.LICENCE_SCOPES) && T.LICENCE_SCOPES.length === 2, "uscopes bd+wr");
+assert(T.APP_LOCKED === false, "app starts unlocked");
+
 console.log(failures ? failures + " FAILURES" : "SMOKE OK");
 process.exit(failures ? 1 : 0);
