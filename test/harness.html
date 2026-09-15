@@ -37,6 +37,15 @@ const X = C.__test;
       () => { X.go("explore", {}); ok(/class="item"/.test(document.querySelector("#app").innerHTML), "explore"); },
 () => { X.go("detail", { kind: "div", id: "dhaka" }); ok(/Dhaka/.test(document.querySelector("#app").innerHTML), "dhaka"); },
       () => { X.go("detail", { kind: "c", id: "050" }); ok(document.querySelector("#app").innerHTML.length > 200, "country"); },
+      () => {
+        const fav0 = X.isFav("c", "050");
+        X.toggleFav("c", "050");
+        ok(X.isFav("c", "050") !== fav0, "fav toggle persists");
+        X.go("explore", { scope: "world", fav: true });
+        ok(/class="item"/.test(document.querySelector("#app").innerHTML), "fav explore lists");
+        const row = [...document.querySelectorAll("#app .item")].map((r) => r.innerHTML);
+        ok(row.some((h) => h.includes("Bangladesh")), "fav filter shows only favs");
+      },
       () => { X.go("map"); ok(!!document.querySelector("#app canvas"), "map canvas"); },
       () => { X.render("play"); ok(/custom|daily/.test(document.querySelector("#app").innerHTML), "play hub"); },
       () => { X.render("custom"); ok(/bd|world-find/.test(document.querySelector("#app").innerHTML), "custom"); },
@@ -44,7 +53,7 @@ const X = C.__test;
       () => { X.render("daily"); ok(/play/i.test(document.querySelector("#app").innerHTML), "daily"); },
       () => { X.D.settings.pin = "1234"; X.go("pin"); X.render("parent"); ok(/Export|export|Backup|backup/.test(document.querySelector("#app").innerHTML), "parent"); },
     ];
-    const names = ["welcome", "home", "explore", "detail-d", "detail-c", "map", "play", "custom", "clock", "daily", "parent"];
+    const names = ["welcome", "home", "explore", "detail-d", "detail-c", "favs", "map", "play", "custom", "clock", "daily", "parent"];
     for (let i = 0; i < screens.length && !failed; i++) {
       try { screens[i](); } catch (e) { out.textContent = "HARNESS-FAIL (screen " + names[i] + "): " + e.message; document.title = "HARNESS-FAIL"; failed = true; }
     }

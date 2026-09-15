@@ -75,6 +75,8 @@ const L = {
     division: "Division", hq: "Headquarters", area: "Area", pop: "Population", density: "Density/km²",
     districts: "Districts", upazilas: "Upazilas", unions: "Unions", est: "Established", rivers: "Rivers",
     listen: "Listen", favorite: "Favorite", starsEarned: "Stars earned",
+    favorites: "Favorites", favoriteRemoved: "Removed from favorites",
+    noResults: "Nothing found", subRegion: "Sub-region", neighbors: "Neighbours",
     capital: "Capital", flag: "Flag",
     qtypes: {
       "bd-hq": "Division from HQ", "bd-fact": "Division from fact", "bd-find": "Find division on map",
@@ -149,6 +151,8 @@ const L = {
     division: "বিভাগ", hq: "সদর দপ্তর", area: "আয়তন", pop: "জনসংখ্যা", density: "ঘনত্ব/বর্গকিমি",
     districts: "জেলা", upazilas: "উপজেলা", unions: "ইউনিয়ন", est: "প্রতিষ্ঠা", rivers: "নদী",
     listen: "শুনুন", favorite: "পছন্দ", starsEarned: "অর্জিত তারা",
+    favorites: "পছন্দের তালিকা", favoriteRemoved: "পছন্দের তালিকা থেকে সরানো হয়েছে",
+    noResults: "কিছু পাওয়া যায়নি", subRegion: "উপ-অঞ্চল", neighbors: "প্রতিবেশী",
     capital: "রাজধানী", flag: "পতাকা",
     qtypes: {
       "bd-hq": "সদর দপ্তর থেকে বিভাগ", "bd-fact": "তথ্য থেকে বিভাগ", "bd-find": "মানচিত্রে বিভাগ খুঁজো",
@@ -229,10 +233,22 @@ function newProfile(id) {
     id, name: "", avatar: AVATARS[0], created: Date.now(),
     stars: {}, itemStats: {}, stats: { asked: 0, correct: 0 },
     daily: { streak: 0, last: "", done: [] },
+    favs: {},
   };
   D.profiles[id] = p; D.active = id; save(); return p;
 }
 function itemKey(type, id) { return type + "|" + id; }
+function isFav(p, type, id) { return !!(p && p.favs && p.favs[itemKey(type, id)]); }
+function toggleFav(p, type, id) {
+  if (!p) return false;
+  if (!p.favs) p.favs = {};
+  const k = itemKey(type, id);
+  const v = !p.favs[k];
+  p.favs[k] = v;
+  if (!v) delete p.favs[k];
+  save();
+  return v;
+}
 function bumpItem(p, type, id, correct) {
   const k = itemKey(type, id);
   const s = (p.itemStats[k] = p.itemStats[k] || { a: 0, ok: 0 });
@@ -448,6 +464,7 @@ MOUNT.home = (p) => {};
 function screenExplore(params = {}) {
   const scope = params.scope || "bd";
   const regionF = params.region || "all";
+  const favF = params.fav || false;
   const q = params.q || "";
   return html(`
     <div class="tabs">
@@ -456,6 +473,7 @@ function screenExplore(params = {}) {
     </div>
     <input class="search" data-q value="${q}" placeholder="${t("search")}">
     <div class="filter-row">
+      <button class="fchip ${favF ? "on" : ""}" data-action="explore-fav" data-fav="1">⭐ ${t("favorites")}</button>
       ${scope === "world"
         ? `<button class="fchip ${regionF === "all" ? "on" : ""}" data-action="explore-region" data-region="all">${t("regionAll")}</button>
            ${REGIONS.map((r) => `<button class="fchip ${regionF === r.id ? "on" : ""}" data-action="explore-region" data-region="${r.id}">${_lang === "bn" ? r.bn : r.en}</button>`).join("")}`
@@ -470,33 +488,57 @@ MOUNT.explore = (params = {}) => {
     const list = APP.querySelector("#explore-list");
     const q = (APP.querySelector("[data-q]").value || "").trim().toLowerCase();
     const regionF = params.region || "all";
+    const favF = !!params.fav;
+    const p = profile();
     let items = [];
     if (scope === "bd") {
       items = DIVS.map((d) => ({
-        key: "div|" + d.id, img: null, ring: avatarEmoji(d.id),
-        nm: name(d), sb: `${d.districts} ${t("districts")} · ${t("hq")}: ${_lang === "bn" ? d.hqBn : d.hq}`, st: starShown(profile(), "d", d.id),
+        key: "div|" + d.id, kind: "d", id: d.id, img: null, ring: avatarEmoji(d.id),
+        nm: name(d), sb: `${d.districts} ${t("districts")} · ${t("hq")}: ${_lang === "bn" ? d.hqBn : d.hq}`, st: starShown(p, "d", d.id),
         open: () => go("detail", { kind: "div", id: d.id }),
       }));
     } else {
       items = CTRY.filter((c) => regionF === "all" || c.region.toLowerCase() === regionF)
         .map((c) => ({
-          key: "c|" + c.id, img: flagUrl(c.flagCode), ring: null,
-          nm: cname(c), sb: `${regionBn(c.region)} · ${cap(c)}`,
-          st: starShown(profile(), "c", c.id),
+          key: "c|" + c.id, kind: "c", id: c.id, img: flagUrl(c.flagCode), ring: null,
+          nm: cname(c), sb: `${regionBn(c.region)} · ${cap(c)}${c.population ? " · 👥 " + fmtPop(c.population) : ""}`,
+          st: starShown(p, "c", c.id),
           open: () => go("detail", { kind: "c", id: c.id }),
         }));
     }
+    if (favF) items = items.filter((it) => isFav(p, it.kind, it.id));
     if (q) items = items.filter((it) => it.nm.toLowerCase().includes(q));
-    if (!items.length) { list.innerHTML = `<div class="card">…</div>`; return; }
-    list.innerHTML = items.map((it) => `
+    if (scope === "world" && !favF && !q && regionF === "all") {
+      list.innerHTML = `<div class="card" style="padding:10px 14px;color:var(--ink-soft);font-size:14px">${t("worldCount", { n: items.length })}</div>`;
+      list.innerHTML += shellRows(items);
+      return;
+    }
+    if (!items.length) { list.innerHTML = `<div class="card">${t("noResults")}</div>`; return; }
+    list.innerHTML = shellRows(items);
+    list.querySelectorAll(".item").forEach((row, i) => {
+      row.addEventListener("click", (e) => {
+        if (e.target.closest("[data-fav]")) return;
+        items[i].open();
+      });
+      row.querySelector("[data-fav]").addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleFav(profile(), items[i].kind, items[i].id);
+        shell();
+      });
+    });
+  }
+  function shellRows(items) {
+    const p = profile();
+    return items.map((it) => {
+      const fav = isFav(p, it.kind, it.id);
+      return `
       <button class="item" data-kind="${it.key.split("|")[0]}">
         ${it.img ? `<img class="flag" src="${it.img}" alt="" loading="lazy">` : `<span class="ring" style="background:${divColor(it.key.split("|")[1])}">${it.ring}</span>`}
         <span class="tx"><span class="nm">${it.nm}</span><br><span class="sb">${it.sb}</span></span>
+        <span class="favbtn" data-fav role="button" aria-label="${t("favorite")}">${fav ? "⭐" : "☆"}</span>
         <span class="st">${it.st ? "★" : ""}</span>
-      </button>`).join("");
-    list.querySelectorAll(".item").forEach((row, i) => {
-      row.addEventListener("click", () => items[i].open());
-    });
+      </button>`;
+    }).join("");
   }
   const qin = APP.querySelector("[data-q]");
   qin.addEventListener("input", () => { params.q = qin.value; shell(); });
@@ -544,17 +586,34 @@ function screenDetail(params) {
   }
   const c = ctryIdx[id];
   const stN = starShown(p, "c", id);
+  const favH = isFav(p, "c", id);
+  const nativeTxt = (c.native && c.native.length) ? c.native.slice(0, 2).join(" · ") : "";
+  const neigh = (c.neighbors && c.neighbors.length) ? c.neighbors.map((n) => {
+    const nc = CTRY.find((x) => x.en === n);
+    return nc ? `<span class="chip">${flagUrl(nc.flagCode) ? `<img class="chip-flag" src="${flagUrl(nc.flagCode)}" alt="">` : ""}${_lang === "bn" ? (nc.bn || n) : n}</span>` : `<span class="chip">${n}</span>`;
+  }).join(" ") : `<span class="chip">—</span>`;
   return html(`
-    <div style="text-align:center;margin:6px 0"><h1 style="color:var(--green)">${cname(c)}</h1><span class="stars">${"★".repeat(stN)}${"☆".repeat(3 - stN)}</span></div>
+    <div style="text-align:center;margin:6px 0">
+      <h1 style="color:var(--green)">${cname(c)}</h1>
+      ${c.official && c.official !== c.en ? `<div class="official-txt">${c.official}</div>` : ""}
+      <span class="stars">${"★".repeat(stN)}${"☆".repeat(3 - stN)}</span>
+      ${nativeTxt ? `<div class="native-txt">${nativeTxt}</div>` : ""}
+    </div>
     <img class="q-flag" src="${flagUrl(c.flagCode)}" alt="${cname(c)}" onerror="this.remove()">
-    <button class="btn btn-paper btn-small" data-action="listen"><span class="icon-txt">🔊</span> ${t("listen")}</button>
+    <div class="btn-row">
+      <button class="btn btn-paper btn-small" data-action="listen"><span class="icon-txt">🔊</span> ${t("listen")}</button>
+      <button class="btn btn-paper btn-small ${favH ? "fav-on" : ""}" data-action="fav"><span class="icon-txt">${favH ? "⭐" : "☆"}</span> ${t("favorite")}</button>
+    </div>
     <div class="card" style="margin-top:10px">
       <div class="stat-grid">
         <div class="stat"><b>${cap(c)}</b><small>${t("capital")}</small></div>
         <div class="stat"><b>${regionBn(c.region)}</b><small>${t("region")}</small></div>
         <div class="stat"><b>${fmtNum(c.area)} km²</b><small>${t("area")}</small></div>
-        <div class="stat"><b>${c.iso3}</b><small>ISO</small></div>
+        <div class="stat"><b>${c.population ? fmtPop(c.population) : "—"}</b><small>${t("pop")}</small></div>
       </div>
+      ${c.subRegion && c.subRegion !== c.region ? `<div class="factbox"><b>${t("subRegion")}:</b> ${_lang === "bn" ? (SUBREGION_BN[c.subRegion] || c.subRegion) : c.subRegion}</div>` : ""}
+      <h3>${t("neighbors")}</h3>
+      <div class="chips">${neigh}</div>
     </div>
     <div class="btn-row"><button class="btn btn-primary" data-nav="play">▶ ${t("play")}</button></div>`);
 }
@@ -564,9 +623,33 @@ MOUNT.detail = (params) => {
   bindAction(APP, "listen", (e, btn) => {
     _lang === "bn" ? speak(item.bn, _lang) : speak(item.en, _lang);
   });
+  bindAction(APP, "fav", (e, btn) => {
+    const v = toggleFav(profile(), params.kind === "div" ? "d" : "c", params.id);
+    btn.classList.toggle("fav-on", v);
+    btn.innerHTML = `<span class="icon-txt">${v ? "⭐" : "☆"}</span> ${t("favorite")}`;
+    toast(v ? "⭐ " + (params.kind === "div" ? name(item) : cname(item)) : t("favoriteRemoved"));
+  });
   speak(_lang === "bn" ? item.bn : item.en, _lang);
 };
 function fmtNum(n) { return n ? n.toLocaleString(undefined) : "—"; }
+function fmtPop(n) {
+  if (!n) return "—";
+  if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+  return String(n);
+}
+const SUBREGION_BN = {
+  "Southern Asia": "দক্ষিণ এশিয়া", "Western Asia": "পশ্চিম এশিয়া", "Central Asia": "মধ্য এশিয়া",
+  "Eastern Asia": "পূর্ব এশিয়া", "South-Eastern Asia": "দক্ষিণ-পূর্ব এশিয়া",
+  "Northern Europe": "উত্তর ইউরোপ", "Western Europe": "পশ্চিম ইউরোপ", "Southern Europe": "দক্ষিণ ইউরোপ",
+  "Eastern Europe": "পূর্ব ইউরোপ", "Northern Africa": "উত্তর আফ্রিকা", "Western Africa": "পশ্চিম আফ্রিকা",
+  "Middle Africa": "মধ্য আফ্রিকা", "Eastern Africa": "পূর্ব আফ্রিকা", "Southern Africa": "দক্ষিণ আফ্রিকা",
+  "Northern America": "উত্তর আমেরিকা", "South America": "দক্ষিণ আমেরিকা", "Central America": "মধ্য আমেরিকা",
+  "Caribbean": "ক্যারিবীয়", "Australia and New Zealand": "অস্ট্রেলিয়া ও নিউজিল্যান্ড",
+  "Melanesia": "মেলানেশিয়া", "Micronesia": "মাইক্রোনেশিয়া", "Polynesia": "পলিনেশিয়া",
+  "Antarctic": "অ্যান্টার্কটিকা",
+};
 
 /* ---------- play home ---------- */
 function screenPlay() {
@@ -721,23 +804,35 @@ function divQuestions(ty) {
 function countryQuestions(ty) {
   return CTRY.map((c) => {
     if (!ctryIdx[c.id]) return null;
-    if (ty === "wf") return { type: "wf", kind: "flag", flagCode: c.flagCode, answerId: c.id, prompt: t("qprompts.wf"), choices: fillChoices(CTRY, c, (x) => cname(x)) };
-    if (ty === "wc") return { type: "wc", kind: "flagchoice", answerId: c.id, prompt: tvar("qprompts.wc", { X: cname(c) }), choices: fillChoices(CTRY, c, (x) => cname(x), { asFlag: true }) };
-    if (ty === "wh") return { type: "wh", kind: "text", answerId: c.id, prompt: tvar("qprompts.wh", { X: cname(c) }), choices: fillChoices(CTRY, c, (x) => cap(x), { uniq: "cap" }) };
-    if (ty === "hc") return { type: "hc", kind: "text", answerId: c.id, prompt: tvar("qprompts.hc", { X: cap(c) }), choices: fillChoices(CTRY, c, (x) => cname(x)) };
+    if (ty === "wf") return { type: "wf", kind: "flag", flagCode: c.flagCode, answerId: c.id, prompt: t("qprompts.wf"), choices: fillChoices(CTRY, c, (x) => cname(x), { regionBias: true }) };
+    if (ty === "wc") return { type: "wc", kind: "flagchoice", answerId: c.id, prompt: tvar("qprompts.wc", { X: cname(c) }), choices: fillChoices(CTRY, c, (x) => cname(x), { asFlag: true, regionBias: true }) };
+    if (ty === "wh") return { type: "wh", kind: "text", answerId: c.id, prompt: tvar("qprompts.wh", { X: cname(c) }), choices: fillChoices(CTRY, c, (x) => cap(x), { uniq: "cap", regionBias: true }) };
+    if (ty === "hc") return { type: "hc", kind: "text", answerId: c.id, prompt: tvar("qprompts.hc", { X: cap(c) }), choices: fillChoices(CTRY, c, (x) => cname(x), { regionBias: true }) };
     if (ty === "world-find") return { type: "world-find", kind: "map", map: "world", answerId: c.id, prompt: tvar("findPromptWorld", { X: cname(c) }) };
     return null;
   }).filter(Boolean);
 }
 function fillChoices(pool, answer, labelFn, opts = {}) {
-  let base = shuffle(pool.filter((x) => x.id !== answer.id)).slice(0, 3);
-  const seen = new Set([answer.id]);
+  const N = opts.n || 3;
+  let base = [];
   if (opts.uniq === "cap") {
     const used = new Set([cap(answer)]);
-    base = [];
     const sh = shuffle(pool.filter((x) => x.id !== answer.id));
-    for (const x of sh) { if (used.has(cap(x))) continue; base.push(x); used.add(cap(x)); if (base.length === 3) break; }
-    if (base.length < 3) base = shuffle(pool.filter((x) => x.id !== answer.id)).slice(0, 3);
+    for (const x of sh) { if (used.has(cap(x))) continue; base.push(x); used.add(cap(x)); if (base.length === N) break; }
+    if (base.length < N) base = base.concat(shuffle(pool.filter((x) => x.id !== answer.id)).slice(0, N));
+  } else if (opts.regionBias && answer.region && pool.some((x) => x !== answer && x.region === answer.region)) {
+    // prefer distractors from the same region when possible (harder, more instructive)
+    const sameRegion = shuffle(pool.filter((x) => x.id !== answer.id && x.region === answer.region));
+    const others = shuffle(pool.filter((x) => x.id !== answer.id && x.region !== answer.region));
+    base = [];
+    let si = 0, oi = 0;
+    while (base.length < N) {
+      if (sameRegion[si]) base.push(sameRegion[si++]);
+      else if (others[oi]) base.push(others[oi++]);
+      else break;
+    }
+  } else {
+    base = shuffle(pool.filter((x) => x.id !== answer.id)).slice(0, N);
   }
   const choices = shuffle([answer, ...base]).map((x) => ({ id: x.id, label: labelFn(x), flag: !!opts.asFlag })).filter((c) => c.label);
   return choices;
@@ -957,7 +1052,13 @@ function screenResults(params) {
   const wrongHTML = r.wrong.length ? `
     <div class="card" style="text-align:left">
       <h3>${t("wrongList")}</h3>
-      <ul style="padding-left:18px;margin-top:8px">${r.wrong.map((q) => `<li style="margin:4px 0">${q.prompt.replace(/^❓\s*/, "").slice(0, 60)}…</li>`).join("")}</ul>
+      <ul class="wrong-list" style="padding-left:0;margin-top:8px;list-style:none">${r.wrong.map((q) => {
+        const correctId = q.answerId;
+        const correctName = q.type === "bd-fact" || q.kind === "map" && q.map === "bd" ? name(divIdx[correctId]) : cname(ctryIdx[correctId]);
+        const lbl = q.choices ? (q.choices.find((c) => c.id === correctId) || { label: correctName }).label : correctName;
+        const icon = q.kind === "map" ? "📍 " : q.kind === "flag" ? `🏳️ ` : q.flagCode ? "❤️ " : "💬 ";
+        return `<li style="margin:6px 0"><span class="qw">${q.prompt.replace(/^❓\s*/, "").slice(0, 70)}</span><br><span class="qa">✅ ${icon}${lbl}</span></li>`;
+      }).join("")}</ul>
       <button class="btn btn-paper btn-small" data-action="retry-wrong" style="margin-top:10px">${t("tryAgainBtn")}</button>
     </div>` : "";
   const shareBtn = navigator.share ? `<button class="btn btn-paper" data-action="share-res" style="flex:1">📤 ${t("share")}</button>` : "";
@@ -1351,6 +1452,9 @@ document.addEventListener("click", (e) => {
   } else if (a === "explore-region") {
     const cur = stack[stack.length - 1].params || {};
     replace("explore", { ...cur, region: act.getAttribute("data-region") });
+  } else if (a === "explore-fav") {
+    const cur = stack[stack.length - 1].params || {};
+    replace("explore", { ...cur, fav: !cur.fav });
   } else if (a === "back") {
     back();
   }
@@ -1412,4 +1516,4 @@ function boot() {
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { buildDailyQuestions, buildQuestionList, divQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot };
+export const __test = { buildDailyQuestions, buildQuestionList, divQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id) };
