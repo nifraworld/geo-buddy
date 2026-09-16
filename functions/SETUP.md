@@ -14,6 +14,8 @@ Until the steps below are done the app is unaffected: it runs open
 1. **Create the database.**
    Storage & Databases → **D1** → **Create database** → name `geobuddy-licence`.
    Open it → **Console** → paste `functions/schema.sql` → **Execute**.
+   *(Created the tables already in v1.8? Paste `functions/schema-1.9.sql` — it adds
+   the `progress` and `submissions` tables and touches nothing else.)*
    *(Already created it from the v1.4 schema? Paste `functions/migrate-1.8.sql`
    instead — it adds the customer columns without dropping rows.)*
    The SQL files are comment-free on purpose: the D1 console rejects a paste
@@ -91,6 +93,9 @@ classroom features on — it does not change entitlements by itself.
 | `POST /api/activate` | app | validate email + key, register device, return packages/plan |
 | `GET /api/licence` | app (launch) | this device's status, plan, packages, teacher flag |
 | `GET/POST /api/keys` | admin page | list customers; make / check / update / revoke / delete |
+| `POST/GET /api/progress` | app / teacher / admin | per-pupil progress for class dashboards |
+| `POST /api/submit` | app | "Report a mistake" |
+| `GET/POST /api/review` | admin page | list / accept / reject submissions |
 | `GET /admin` | you | the admin page (password = `REVIEW_KEY`) |
 
 The old private key-generator HTML in `admin-tools/` still works offline as

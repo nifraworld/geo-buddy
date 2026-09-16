@@ -78,6 +78,9 @@ const L = {
     homeDailyDone: "Come back tomorrow to keep your {n}-day streak",
     theme: "Appearance", themeSub: "Light, dark, or follow the phone", theme_auto: "Auto", theme_light: "Light", theme_dark: "Dark",
     licenceSubLocked: "Quizzes need an activated key. Explore and the maps are always free.",
+    shareProgress: "Share progress with your school", shareProgressSub: "Sends each child's level, stars and weak spots to the key holder's class dashboard",
+    classProgress: "Class progress", classEmpty: "No pupil has played on this key yet.", classCount: "{n} pupils", loading: "Loading…",
+    reportMistake: "Report a mistake", reportPlaceholder: "What is wrong? (name, spelling, fact, map…)", reportEmail: "Your email (optional)", send: "Send", reportThanks: "Thank you — we will check it",
     teacher: "Teacher", teacherCode: "Teacher code", teacherCodeSub: "Optional — given with school and coaching plans.", save: "Save", saved: "Saved",
     buyTitle: "Get the full app", buyStep1: "Send the amount by bKash to {bkash} (Send Money)",
     buyStep2: "Message us the bKash number you paid from and your email", buyStep3: "You get your key within a day — type it above",
@@ -194,6 +197,9 @@ const L = {
     homeDailyDone: "{n} দিনের ধারা ধরে রাখতে কাল আবার এসো",
     theme: "চেহারা", themeSub: "হালকা, গাঢ়, বা ফোনের মতো", theme_auto: "স্বয়ং", theme_light: "হালকা", theme_dark: "গাঢ়",
     licenceSubLocked: "কুইজের জন্য চালু করা কী দরকার। ঘুরে দেখা ও মানচিত্র সবসময় বিনামূল্যে।",
+    shareProgress: "স্কুলের সাথে অগ্রগতি শেয়ার", shareProgressSub: "প্রতিটি শিশুর স্তর, তারা ও দুর্বল জায়গা কী-ধারকের ক্লাস ড্যাশবোর্ডে পাঠায়",
+    classProgress: "ক্লাসের অগ্রগতি", classEmpty: "এই কী-তে এখনো কোনো শিক্ষার্থী খেলেনি।", classCount: "{n} জন শিক্ষার্থী", loading: "লোড হচ্ছে…",
+    reportMistake: "ভুল জানাও", reportPlaceholder: "কী ভুল আছে? (নাম, বানান, তথ্য, মানচিত্র…)", reportEmail: "আপনার ইমেইল (ঐচ্ছিক)", send: "পাঠাও", reportThanks: "ধন্যবাদ — আমরা দেখব",
     teacher: "শিক্ষক", teacherCode: "শিক্ষক কোড", teacherCodeSub: "ঐচ্ছিক — স্কুল ও কোচিং প্ল্যানের সাথে দেওয়া হয়।", save: "সংরক্ষণ", saved: "সংরক্ষিত",
     buyTitle: "পূর্ণ অ্যাপ নিন", buyStep1: "বিকাশে {bkash} নম্বরে টাকা পাঠান (Send Money)",
     buyStep2: "যে বিকাশ নম্বর থেকে পাঠালেন সেটি ও আপনার ইমেইল আমাদের মেসেজ করুন", buyStep3: "এক দিনের মধ্যে কী পাবেন — উপরে টাইপ করুন",
@@ -467,6 +473,36 @@ function scopeAllowed(scope) {
 function lockMark(scope) {
   const need = scope === "both" ? ["bd", "wr"] : [scope === "world" ? "wr" : "bd"];
   return need.every(hasScope) ? "" : `<span class="lock-mark" title="${t("licNeeded")}">🔒</span>`;
+}
+/* ---- progress telemetry for the class dashboard ----
+   Only when a key is active and the parent has not switched sharing off.
+   One row per child; throttled to every 10 minutes and only online. */
+function childSummary(p) {
+  const st = areaStats(p);
+  const acc = p.stats.asked ? Math.round((p.stats.correct / p.stats.asked) * 100) : 0;
+  // weakest items: most misses, at least 2 attempts
+  const weak = Object.entries(p.itemStats || {})
+    .filter(([, v]) => v.a >= 2 && v.a - v.ok >= 1)
+    .sort((a, b) => (b[1].a - b[1].ok) - (a[1].a - a[1].ok)).slice(0, 8)
+    .map(([k]) => { const [ty, id] = k.split("|"); const o = ty === "d" ? divIdx[id] : ty === "z" ? distIdx[id] : ctryIdx[id]; return o ? (ty === "c" ? cname(o) : ty === "z" ? dname(o) : name(o)) : id; });
+  return {
+    hash: "p" + Math.abs(hashStr(p.id + "|" + p.name)).toString(36), name: p.name,
+    level: getLevel(p), xp: getXP(p), stars: totalStars(p), streak: p.daily.streak || 0, accuracy: acc,
+    asked: p.stats.asked, correct: p.stats.correct,
+    areas: { d: st.d, z: st.z, c: st.c }, weak, badges: Object.keys(p.badges || {}).length,
+    lastPractised: p.lastPlayed || "",
+  };
+}
+async function pushProgress(force) {
+  const l = licence();
+  if (!l.key || !l.email || D.settings.shareProgress === false || !navigator.onLine) return;
+  const now = Date.now();
+  if (!force && now - (D.settings.progressSentAt || 0) < 10 * 60 * 1000) return;
+  D.settings.progressSentAt = now; save();
+  try {
+    await fetch("/api/progress", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: l.email, device: deviceId(), appVersion: GEO.version || "", children: Object.values(D.profiles).map(childSummary) }) });
+  } catch {}
 }
 function clearLicence() {
   D.settings.licence = { email: "", key: "", status: "free", plan: "Home", packages: [], deviceLimit: 0, deviceCount: 0, checkedAt: Date.now() };
@@ -760,7 +796,7 @@ function render(name, params) {
     explore: screenExplore, detail: screenDetail, map: screenMap,
     play: screenPlay, session: screenSession, results: screenResults,
     daily: screenDaily, parent: screenParent, pin: screenPin, about: screenAbout,
-    custom: screenCustom, clock: screenClock, learn: screenLearn, cards: screenCards,
+    custom: screenCustom, clock: screenClock, learn: screenLearn, cards: screenCards, class: screenClass,
   }[name];
   // leaving the quiz screen abandons the session: its answer/next timers must
   // not append the next question onto whatever screen is shown now
@@ -1018,7 +1054,8 @@ function screenDetail(params) {
         <h3>${t("rivers")}</h3><ul class="rivers">${(d.rivers || []).map((r) => `<li>${_lang === "bn" ? r[1] : r[0]}</li>`).join("")}</ul>
         ${d.photo ? `<p class="attr">${tvar("photoCredits", { a: d.photo.artist }) } · <a href="${d.photo.page}" rel="noopener">CC</a></p>` : ""}
       </div>
-      <div class="btn-row"><button class="btn btn-primary" data-nav="play" data-daily="1">▶ ${t("play")}</button></div>`);
+      <div class="btn-row"><button class="btn btn-primary" data-nav="play" data-daily="1">▶ ${t("play")}</button></div>
+      ${reportLink()}`);
   }
   if (kind === "z") {
     const d = distIdx[id];
@@ -1045,7 +1082,8 @@ function screenDetail(params) {
         </div>
         <div class="factbox">${tvar("districtPractise", { d: dname(d), dv: name(div) })}</div>
       </div>
-      <div class="btn-row"><button class="btn btn-primary" data-nav="play">▶ ${t("play")}</button></div>`);
+      <div class="btn-row"><button class="btn btn-primary" data-nav="play">▶ ${t("play")}</button></div>
+      ${reportLink()}`);
   }
   const c = ctryIdx[id];
   const stN = starShown(p, "c", id);
@@ -1078,7 +1116,39 @@ function screenDetail(params) {
       <h3>${t("neighbors")}</h3>
       <div class="chips">${neigh}</div>
     </div>
-    <div class="btn-row"><button class="btn btn-primary" data-nav="play">▶ ${t("play")}</button></div>`);
+    <div class="btn-row"><button class="btn btn-primary" data-nav="play">▶ ${t("play")}</button></div>
+    ${reportLink()}`);
+}
+function reportLink() { return `<button class="report-link" data-action="report">⚠️ ${t("reportMistake")}</button>`; }
+function openReportModal(item, kind) {
+  const nm = kind === "c" ? cname(item) : kind === "z" ? dname(item) : name(item);
+  const dlg = html(`<div class="modal-bg"><div class="modal">
+      <h3>⚠️ ${t("reportMistake")}</h3>
+      <p class="ds" style="margin:6px 0 10px">${nm}</p>
+      <textarea id="rp-text" class="lic-inp" rows="4" maxlength="1000" placeholder="${t("reportPlaceholder")}"></textarea>
+      <input id="rp-mail" class="lic-inp" inputmode="email" placeholder="${t("reportEmail")}" style="margin-top:8px" value="${licence().email || ""}">
+      <input id="rp-bot" style="display:none" tabindex="-1" autocomplete="off">
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn btn-primary" id="rp-send">📨 ${t("send")}</button>
+        <button class="btn btn-paper" data-close="1">${t("cancel")}</button>
+      </div></div></div>`).firstElementChild;
+  document.body.appendChild(dlg);
+  dlg.querySelector("[data-close]").addEventListener("click", () => dlg.remove());
+  dlg.addEventListener("click", (e) => { if (e.target.classList.contains("modal-bg")) dlg.remove(); });
+  dlg.querySelector("#rp-send").addEventListener("click", async () => {
+    const text = dlg.querySelector("#rp-text").value.trim();
+    if (!text) return;
+    const btn = dlg.querySelector("#rp-send"); btn.disabled = true;
+    try {
+      const res = await fetch("/api/submit", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "report", itemKind: kind === "div" ? "d" : kind, itemId: item.id, itemName: item.en, text, lang: _lang,
+          email: dlg.querySelector("#rp-mail").value.trim(), device: deviceId(), appVersion: GEO.version || "", bot: !!dlg.querySelector("#rp-bot").value }) });
+      const j = await res.json();
+      toast(j.ok ? "✅ " + t("reportThanks") : t("licErrNetwork"));
+    } catch { toast(t("licErrNetwork")); }
+    dlg.remove();
+  });
+  setTimeout(() => dlg.querySelector("#rp-text").focus(), 30);
 }
 MOUNT.detail = (params) => {
   const p = profile();
@@ -1093,6 +1163,7 @@ MOUNT.detail = (params) => {
     btn.innerHTML = `<span class="icon-txt">${v ? "⭐" : "☆"}</span> ${t("favorite")}`;
     toast(v ? "⭐ " + (params.kind === "div" ? name(item) : params.kind === "z" ? dname(item) : cname(item)) : t("favoriteRemoved"));
   });
+  bindAction(APP, "report", () => openReportModal(item, params.kind));
   speak(_lang === "bn" ? item.bn : item.en, _lang);
 };
 function fmtNum(n) { return n ? n.toLocaleString(undefined) : "—"; }
@@ -1295,6 +1366,33 @@ MOUNT.cards = (params = {}) => {
     if (!qs.length) { toast("…"); return; }
     startSession({ title: deck.title, questions: qs, clock: false, daily: false });
   });
+};
+
+/* ---------- class progress (teacher device) ---------- */
+function screenClass() {
+  return html(`
+    <h2 class="sec-title">🎓 ${t("classProgress")}</h2>
+    <div class="card" id="class-box"><p class="ds">${t("loading")}</p></div>`);
+}
+MOUNT.class = async () => {
+  const box = APP.querySelector("#class-box");
+  const l = licence();
+  if (!l.email || !l.tc) { box.innerHTML = `<p class="ds">${t("teacherCodeSub")}</p>`; return; }
+  if (!navigator.onLine) { box.innerHTML = `<p class="ds">${t("licOffline")}</p>`; return; }
+  try {
+    const res = await fetch("/api/progress?email=" + encodeURIComponent(l.email) + "&tc=" + encodeURIComponent(l.tc), { cache: "no-store" });
+    const j = await res.json();
+    if (!j.ok) { box.innerHTML = `<p class="ds">${j.error === "unauthorized" ? t("teacherCodeSub") : j.error || "…"}</p>`; return; }
+    if (!j.children.length) { box.innerHTML = `<p class="ds">${t("classEmpty")}</p>`; return; }
+    const kids = j.children.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    box.innerHTML = `<p class="ds">${tvar("classCount", { n: kids.length })}</p>
+      <div class="class-list">${kids.map((k) => `
+        <div class="pupil">
+          <div class="pupil-top"><b>${k.name || "?"}</b><span class="lv-pill">${t("level")} ${k.level}</span><span class="acc ${k.accuracy >= 75 ? "good" : k.accuracy >= 50 ? "mid" : "low"}">${k.accuracy}%</span></div>
+          <div class="pupil-row">⭐ ${k.stars} · 🔥 ${k.streak} · ${k.correct}/${k.asked} ✓ · 🏅 ${k.badges}${k.lastPractised ? ` · ${k.lastPractised}` : ""}</div>
+          ${k.weak && k.weak.length ? `<div class="pupil-row weak">💪 ${k.weak.slice(0, 5).join(", ")}</div>` : ""}
+        </div>`).join("")}</div>`;
+  } catch { box.innerHTML = `<p class="ds">${t("licOffline")}</p>`; }
 };
 
 /* ---------- clock mode ---------- */
@@ -1794,6 +1892,8 @@ function finish() {
     setTimeout(() => { sfx("levelUp"); toast(`⬆️ Level ${newLv}!`); confetti(); }, newBadges.length ? 2800 : 600);
   }
   if (result.wrong.length === total) speak(t("wrong"), _lang);
+  p.lastPlayed = todayKey(); save();
+  pushProgress(false);
   replace("results", result);
 }
 
@@ -2441,6 +2541,11 @@ function licCard() {
         ${has ? `<button class="btn btn-mini" style="background:var(--inset);color:var(--bad)" data-action="p-lic-remove">${t("licRemove")}</button>` : ""}
       </div>
       ${has ? `
+      <div class="setting">
+        <span><span class="tt">📊 ${t("shareProgress")}</span><br><span class="ds">${t("shareProgressSub")}</span></span>
+        <button class="switch ${D.settings.shareProgress === false ? "" : "on"}" data-action="p-share"></button>
+      </div>
+      ${l.isTeacher ? `<button class="btn btn-primary" style="margin:10px 0" data-nav="class">🎓 ${t("classProgress")}</button>` : ""}
       <details class="tc"><summary>🎓 ${t("teacherCode")}</summary>
         <div class="row-inl"><input id="lic-tc" class="lic-inp" spellcheck="false" autocomplete="off" placeholder="TP-XXXX-XXXX" value="${l.tc || ""}"><button class="btn btn-mini btn-paper" data-action="p-lic-tc">${t("save")}</button></div>
         <p class="ds">${t("teacherCodeSub")}</p>
@@ -2543,6 +2648,7 @@ MOUNT.parent = (params) => {
       toast(err === "network" ? t("licErrNetwork") : (err === "no match" ? t("licErrMatch") : t("licErrFields")));
     }
   });
+  bindAction(APP, "p-share", () => { D.settings.shareProgress = D.settings.shareProgress === false ? true : false; save(); if (D.settings.shareProgress !== false) pushProgress(true); render("parent"); });
   bindAction(APP, "p-lic-tc", async () => {
     const l = licence();
     l.tc = ((APP.querySelector("#lic-tc") || {}).value || "").trim().toUpperCase();
@@ -2700,8 +2806,9 @@ function boot() {
   go("welcome");
   setupServiceWorker();
   refreshSale();
+  setTimeout(() => pushProgress(false), 4000);
 }
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };
+export const __test = { childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };

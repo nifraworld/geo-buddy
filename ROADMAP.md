@@ -1,6 +1,6 @@
 # Geo Buddy — Bangladesh & World Geography for Kids
 
-Repository: `D:\GeoBuddy`  ·  Project: Geo Buddy  ·  Status: v1.8 (selling & admin) build
+Repository: `D:\GeoBuddy`  ·  Project: Geo Buddy  ·  Status: v1.9 (admin parity) build
 
 An **offline-first PWA** (HTML/JS/CSS + service worker) that borrows the **structure
 and screens of Spelling Buddy** (`spelling.nifraworld.com`) and the **feature ideas of
@@ -184,6 +184,21 @@ geo.nifraworld.com root
   - Not done (needs you): D1 + secrets in the dashboard, a fresh `LICENCE_SECRET`,
     flipping `sale.json`. bKash *API* integration deliberately skipped — manual
     confirmation via the admin page fits the volume.
+- **V1.9** Admin parity with Spelling Buddy. ✅
+  - `/admin` tabs: **Dashboard** (customers, paid, ৳ recorded, devices, active this
+    week, activations 7/30d, app versions, needs-attention), Customers, Make a key,
+    **Class dashboards** (per-pupil level/accuracy/areas/stars/streak/badges/weak
+    spots, CSV), **Submissions** (pending badge, accept/reject, bulk, "copy accepted
+    as a fix list" to paste into a Claude session), Check a key, Export.
+  - `/api/progress` (POST from app, GET for admin or teacher code), `/api/submit`
+    ("Report a mistake"), `/api/review`; `schema-1.9.sql` adds `progress` +
+    `submissions` (also appended to `schema.sql`).
+  - App: progress push after each session (key active, online, ≤ every 10 min,
+    parent toggle "Share progress with your school"); 🎓 **Class progress** screen
+    on a device with a valid teacher code; **⚠️ Report a mistake** on every detail
+    screen (honeypot, optional email).
+  - Note: the Bash tool used in these sessions collapses `\` in heredocs — write
+    scripts to files (Write tool) when the payload contains escapes.
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

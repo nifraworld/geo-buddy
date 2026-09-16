@@ -154,6 +154,17 @@ for (const ty of ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d
   T.setLocked(false);
   assert(T.hasScope("wr"), "unlocked again");
 }
+// v1.9: child summary for the class dashboard
+{
+  const p = T.profile() || T.newProfile("smoke2");
+  p.name = "Test Kid"; p.stats.asked = 10; p.stats.correct = 7;
+  p.itemStats["c|050"] = { a: 3, ok: 1 }; // Bangladesh id 050
+  const c = T.childSummary(p);
+  assert(c.name === "Test Kid" && c.accuracy === 70 && c.asked === 10, "childSummary basics");
+  assert(Array.isArray(c.weak) && c.weak.includes("Bangladesh"), "childSummary lists weak items by name, got " + JSON.stringify(c.weak));
+  assert(/^p[0-9a-z]+$/.test(c.hash) && c.areas.c.a >= 3, "childSummary hash + areas");
+  delete p.itemStats["c|050"];
+}
 // builder for world types
 for (const ty of ["wf", "wc", "wh", "hc", "world-find"]) {
   const qs = T.countryQuestions(ty);

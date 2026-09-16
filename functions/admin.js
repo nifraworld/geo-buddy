@@ -62,14 +62,54 @@ details summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--board2
 
 <div id="app" class="hidden">
 <div class="tabs">
-  <button class="on" data-tab="customers" onclick="tab('customers')">Customers</button>
+  <button class="on" data-tab="dash" onclick="tab('dash')">Dashboard</button>
+  <button data-tab="customers" onclick="tab('customers')">Customers</button>
   <button data-tab="make" onclick="tab('make')">Make a key</button>
+  <button data-tab="class" onclick="tab('class')">Class dashboards</button>
+  <button data-tab="subs" onclick="tab('subs')">Submissions <span id="subs-n" class="tag" style="display:none"></span></button>
   <button data-tab="check" onclick="tab('check')">Check a key</button>
   <button data-tab="export" onclick="tab('export')">Export</button>
   <button class="fix" style="margin-left:auto;background:transparent;color:#B8D9C8" onclick="logout()">Lock</button>
 </div>
 
-<section id="tab-customers">
+<section id="tab-dash">
+  <div class="card">
+    <div class="stats" id="dash-stats"></div>
+    <div class="row" style="align-items:start">
+      <div><label>Activations</label><div id="dash-act" class="note"></div></div>
+      <div><label>App versions in use</label><div id="dash-ver" class="note"></div></div>
+      <div><label>Needs attention</label><div id="dash-att" class="note"></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="tab-class" class="hidden">
+  <div class="card">
+    <div class="row">
+      <div><label>Customer email (the key holder)</label><input id="cl-email" inputmode="email" list="cl-emails" placeholder="school@example.com"></div>
+      <button class="go fix" onclick="loadClass()">Load class</button>
+    </div>
+    <datalist id="cl-emails"></datalist>
+    <div id="cl-out" style="margin-top:12px"></div>
+    <div class="note" style="margin-top:8px">What the teacher sees on their own phone with the teacher code. Pupils' phones send this when online, unless the parent switched sharing off.</div>
+  </div>
+</section>
+
+<section id="tab-subs" class="hidden">
+  <div class="card">
+    <div class="row">
+      <select id="subs-status" class="fix" onchange="loadSubs()" style="width:auto"><option value="pending">Pending</option><option value="accepted">Accepted</option><option value="rejected">Rejected</option><option value="all">All</option></select>
+      <button class="fix" onclick="loadSubs()">&#8635; Refresh</button>
+      <button class="fix ok" onclick="resolveChecked('accepted')">Accept checked</button>
+      <button class="fix danger" onclick="resolveChecked('rejected')">Reject checked</button>
+      <button class="fix" onclick="copyAccepted()">Copy accepted as a fix list</button>
+    </div>
+    <div id="subs-out" style="margin-top:12px"></div>
+    <div class="note" style="margin-top:8px">"Report a mistake" from the app's detail screens. Accept the ones that are right, then paste the fix list into a Claude session to apply them to the data.</div>
+  </div>
+</section>
+
+<section id="tab-customers" class="hidden">
   <div class="card">
     <div class="stats" id="stats"></div>
     <div class="row">
@@ -143,14 +183,103 @@ function login() {
 function logout() { KEY = ""; try { sessionStorage.removeItem("gbReview"); } catch (e) {} location.reload(); }
 function tab(name) {
   document.querySelectorAll(".tabs [data-tab]").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-tab") === name); });
-  ["customers", "make", "check", "export"].forEach(function (n) { document.getElementById("tab-" + n).classList.toggle("hidden", n !== name); });
+  ["dash", "customers", "make", "class", "subs", "check", "export"].forEach(function (n) { document.getElementById("tab-" + n).classList.toggle("hidden", n !== name); });
+  if (name === "subs" && !SUBS.length) loadSubs();
 }
 function load() { api("GET").then(got); }
 function got(j) {
   if (!j.ok) { alert(j.error || "error"); return; }
   ROWS = j.keys || [];
   if (j.pending) document.getElementById("list").innerHTML = '<div class="note">' + esc(j.pending) + "</div>";
-  draw();
+  draw(); drawDash(); loadSubsCount();
+  document.getElementById("cl-emails").innerHTML = ROWS.map(function (r) { return '<option value="' + esc(r.email) + '">'; }).join("");
+}
+function drawDash() {
+  var paid = ROWS.filter(function (r) { return r.paid; }).length;
+  var devs = []; ROWS.forEach(function (r) { r.devices.forEach(function (d) { devs.push(d); }); });
+  var now = Date.now(), day = 86400000;
+  var since = function (n) { return devs.filter(function (d) { return now - Date.parse(d.first_seen) < n * day; }).length; };
+  var active7 = devs.filter(function (d) { return now - Date.parse(d.last_seen) < 7 * day; }).length;
+  var vers = {}; devs.forEach(function (d) { var v = d.app_version || "?"; vers[v] = (vers[v] || 0) + 1; });
+  var amount = ROWS.reduce(function (s, r) { return s + (parseFloat(String(r.amount || "").replace(/[^0-9.]/g, "")) || 0); }, 0);
+  document.getElementById("dash-stats").innerHTML =
+    '<span class="stat">' + ROWS.length + ' customers</span><span class="stat">' + paid + ' paid</span>' +
+    '<span class="stat">&#2547; ' + amount.toLocaleString() + ' recorded</span>' +
+    '<span class="stat">' + devs.length + ' devices</span><span class="stat">' + active7 + ' active this week</span>';
+  document.getElementById("dash-act").innerHTML = "Last 7 days: <b>" + since(7) + "</b><br>Last 30 days: <b>" + since(30) + "</b><br>All time: <b>" + devs.length + "</b>";
+  document.getElementById("dash-ver").innerHTML = Object.keys(vers).sort().reverse().map(function (v) { return "v" + esc(v) + ": <b>" + vers[v] + "</b>"; }).join("<br>") || "&mdash;";
+  var att = [];
+  ROWS.filter(function (r) { return r.over; }).forEach(function (r) { att.push("&#9888; " + esc(r.email) + " is over its device limit (" + r.deviceCount + "/" + r.device_limit + ")"); });
+  ROWS.filter(function (r) { return !r.paid && r.deviceCount > 0; }).forEach(function (r) { att.push("&#128176; " + esc(r.email) + " activated but not marked paid"); });
+  document.getElementById("dash-att").innerHTML = att.length ? att.join("<br>") : "Nothing &mdash; all good.";
+}
+/* ---- class dashboards ---- */
+var CLASS = [];
+function loadClass() {
+  var email = document.getElementById("cl-email").value.trim().toLowerCase();
+  if (!email) return;
+  document.getElementById("cl-out").innerHTML = '<div class="note">Loading&hellip;</div>';
+  fetch("/api/progress?email=" + encodeURIComponent(email), { headers: { "x-review-key": KEY } }).then(function (r) { return r.json(); }).then(function (j) {
+    if (!j.ok) { document.getElementById("cl-out").innerHTML = '<div class="note">' + esc(j.error || "failed") + "</div>"; return; }
+    CLASS = j.children || [];
+    if (!CLASS.length) { document.getElementById("cl-out").innerHTML = '<div class="note">No progress yet' + (j.pending ? " &mdash; " + esc(j.pending) : "") + ".</div>"; return; }
+    CLASS.sort(function (a, b) { return (a.name || "").localeCompare(b.name || ""); });
+    var area = function (a) { return a && a.a ? Math.round(a.ok / a.a * 100) + "% (" + a.a + ")" : "&mdash;"; };
+    document.getElementById("cl-out").innerHTML = '<div class="stats"><span class="stat">' + CLASS.length + ' pupils</span><span class="stat">avg ' +
+      Math.round(CLASS.reduce(function (s, k) { return s + (k.accuracy || 0); }, 0) / CLASS.length) + '% accuracy</span></div>' +
+      "<table><thead><tr><th>Pupil</th><th>Level</th><th>Accuracy</th><th>Divisions</th><th>Districts</th><th>World</th><th>Stars</th><th>Streak</th><th>Badges</th><th>Weak spots</th><th>Last played</th><th>Device</th></tr></thead><tbody>" +
+      CLASS.map(function (k) {
+        return "<tr><td><b>" + esc(k.name || "?") + "</b></td><td>" + k.level + "</td><td><b>" + k.accuracy + '%</b> <span class="note">' + k.correct + "/" + k.asked + "</span></td>" +
+          "<td>" + area(k.areas.d) + "</td><td>" + area(k.areas.z) + "</td><td>" + area(k.areas.c) + "</td>" +
+          "<td>" + k.stars + "</td><td>" + k.streak + "</td><td>" + k.badges + "</td><td>" + esc((k.weak || []).slice(0, 6).join(", ")) + "</td>" +
+          "<td>" + esc(k.lastPractised || "") + '</td><td class="dev">' + esc(k.device) + " v" + esc(k.appVersion || "?") + "</td></tr>";
+      }).join("") + "</tbody></table>" +
+      '<div class="row" style="margin-top:10px"><button class="fix" onclick="classCSV()">Download as spreadsheet</button></div>';
+  });
+}
+function classCSV() {
+  var head = ["pupil", "level", "xp", "accuracy", "asked", "correct", "divisions_acc", "districts_acc", "world_acc", "stars", "streak", "badges", "weak", "last_played", "device", "app_version"];
+  var pct = function (a) { return a && a.a ? Math.round(a.ok / a.a * 100) : ""; };
+  var rows = CLASS.map(function (k) { return [k.name, k.level, k.xp, k.accuracy, k.asked, k.correct, pct(k.areas.d), pct(k.areas.z), pct(k.areas.c), k.stars, k.streak, k.badges, (k.weak || []).join("; "), k.lastPractised, k.device, k.appVersion]; });
+  dl("geo-buddy-class-" + document.getElementById("cl-email").value.trim() + ".csv", [head].concat(rows).map(function (r) { return r.map(function (c) { return '"' + String(c == null ? "" : c).replace(/"/g, '""') + '"'; }).join(","); }).join("\\n"), "text/csv");
+}
+/* ---- submissions ---- */
+var SUBS = [];
+function loadSubsCount() {
+  fetch("/api/review?status=pending", { headers: { "x-review-key": KEY } }).then(function (r) { return r.json(); }).then(function (j) {
+    var n = (j.rows || []).length, el = document.getElementById("subs-n");
+    el.style.display = n ? "inline-block" : "none"; el.textContent = n;
+  }).catch(function () {});
+}
+function loadSubs() {
+  var st = document.getElementById("subs-status").value;
+  document.getElementById("subs-out").innerHTML = '<div class="note">Loading&hellip;</div>';
+  fetch("/api/review?status=" + st, { headers: { "x-review-key": KEY } }).then(function (r) { return r.json(); }).then(function (j) {
+    if (!j.ok) { document.getElementById("subs-out").innerHTML = '<div class="note">' + esc(j.error || "failed") + "</div>"; return; }
+    SUBS = j.rows || [];
+    if (!SUBS.length) { document.getElementById("subs-out").innerHTML = '<div class="note">Nothing here' + (j.pending ? " &mdash; " + esc(j.pending) : "") + ".</div>"; return; }
+    var kindName = { d: "division", z: "district", c: "country" };
+    document.getElementById("subs-out").innerHTML = "<table><thead><tr><th></th><th>About</th><th>Report</th><th>From</th><th>Status</th></tr></thead><tbody>" +
+      SUBS.map(function (r) {
+        var cls = r.status === "rejected" ? ' class="revoked"' : r.status === "accepted" ? "" : ' class="unpaid"';
+        var act = r.status === "pending"
+          ? '<br><button class="mini ok" onclick="resolve([' + r.id + '],\\'accepted\\')">Accept</button> <button class="mini danger" onclick="resolve([' + r.id + '],\\'rejected\\')">Reject</button>'
+          : '<br><button class="mini" onclick="resolve([' + r.id + '],\\'pending\\')">Reopen</button>';
+        return "<tr" + cls + '><td><input type="checkbox" class="subchk" value="' + r.id + '" style="width:auto"></td>' +
+          "<td><b>" + esc(r.item_name || r.item_id || "?") + '</b><br><span class="note">' + esc(kindName[r.item_kind] || r.item_kind || "") + " &middot; " + esc(r.lang || "") + " &middot; v" + esc(r.app_version || "?") + "</span></td>" +
+          '<td style="max-width:420px;white-space:pre-wrap">' + esc(r.text) + "</td>" +
+          '<td class="note">' + (r.email ? esc(r.email) : "&mdash;") + "<br>" + esc((r.created || "").slice(0, 10)) + "</td>" +
+          '<td><span class="tag ' + (r.status === "accepted" ? "full" : r.status === "rejected" ? "free" : "grace") + '">' + esc(r.status) + "</span>" + act + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  });
+}
+function resolve(ids, status) { fetch("/api/review", { method: "POST", headers: { "content-type": "application/json", "x-review-key": KEY }, body: JSON.stringify({ ids: ids, status: status }) }).then(function () { loadSubs(); loadSubsCount(); }); }
+function resolveChecked(status) { var ids = Array.prototype.map.call(document.querySelectorAll(".subchk:checked"), function (c) { return parseInt(c.value, 10); }); if (ids.length) resolve(ids, status); }
+function copyAccepted() {
+  var acc = SUBS.filter(function (r) { return r.status === "accepted"; });
+  if (!acc.length) { alert("Load the Accepted list first."); return; }
+  var txt = "Geo Buddy data fixes (accepted user reports):\\n" + acc.map(function (r) { return "- [" + (r.item_kind || "?") + " " + (r.item_id || "") + "] " + (r.item_name || "") + ": " + r.text; }).join("\\n");
+  navigator.clipboard.writeText(txt).then(function () { alert("Copied " + acc.length + " fixes."); }, function () { prompt("Copy:", txt); });
 }
 function esc(x) { return String(x == null ? "" : x).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 function planName(n) { return n <= 3 ? "Home · 3" : n <= 10 ? "Family · " + n : n >= 999 ? "Coaching · ∞" : "Coaching · " + n; }
