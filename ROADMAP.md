@@ -142,6 +142,14 @@ geo.nifraworld.com root
   - Fixed: level-up never fired (level compared after stats were already bumped);
     badges are also awarded when Home renders, not only at quiz end.
   - Open: Bangla greeting নমস্কার → consider হ্যালো/শুভেচ্ছা (neutral).
+- **V1.6.1** Typography + dark mode. ✅
+  - Baloo Da 2 (OFL, Bengali + Latin, variable weight) bundled and used for headings,
+    buttons, prompts and numbers; body stays Noto/system. (The Noto woff2 files the
+    CSS referenced were never bundled — removed the dead @font-face.)
+  - Dark theme via semantic tokens (`--brand`, `--inset`, `--bar`, `--ok-bg`…):
+    follows the phone by default, Parent Zone → Appearance overrides (Auto/Light/Dark).
+    Canvas maps get dark water/land/label inks. `theme-color` meta follows.
+  - Map labels avoid the zoom buttons and hint pill at every zoom.
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

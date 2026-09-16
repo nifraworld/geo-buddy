@@ -76,6 +76,7 @@ const L = {
     licNeeded: "Ask a parent to activate a key for this section",
     updateReady: "New version ready — tap to update",
     homeDailyDone: "Come back tomorrow to keep your {n}-day streak",
+    theme: "Appearance", themeSub: "Light, dark, or follow the phone", theme_auto: "Auto", theme_light: "Light", theme_dark: "Dark",
     sugWeak: "Practise your weak spot", sugNew: "Try something new", sugStart: "Start here",
     sugDivisions: "Bangladesh divisions", sugDistricts: "Bangladesh districts", sugWorld: "World flags, capitals & map",
     learned: "You got these right:", xpGained: "+{n} XP", levelUpTitle: "Level {n}!",
@@ -176,6 +177,7 @@ const L = {
     licNeeded: "এই অংশের জন্য অভিভাবককে কী চালু করতে বলো",
     updateReady: "নতুন সংস্করণ প্রস্তুত — আপডেট করতে স্পর্শ করো",
     homeDailyDone: "{n} দিনের ধারা ধরে রাখতে কাল আবার এসো",
+    theme: "চেহারা", themeSub: "হালকা, গাঢ়, বা ফোনের মতো", theme_auto: "স্বয়ং", theme_light: "হালকা", theme_dark: "গাঢ়",
     sugWeak: "দুর্বল জায়গায় অনুশীলন করো", sugNew: "নতুন কিছু চেষ্টা করো", sugStart: "এখান থেকে শুরু",
     sugDivisions: "বাংলাদেশের বিভাগ", sugDistricts: "বাংলাদেশের জেলা", sugWorld: "বিশ্বের পতাকা, রাজধানী ও মানচিত্র",
     learned: "এগুলো ঠিক হয়েছে:", xpGained: "+{n} XP", levelUpTitle: "স্তর {n}!",
@@ -281,7 +283,9 @@ function load() {
   if (!D.profiles) D.profiles = {};
   if (!D.settings) D.settings = {};
   if (D.settings.soundEnabled === undefined) D.settings.soundEnabled = true;
+  if (!["auto", "light", "dark"].includes(D.settings.theme)) D.settings.theme = "auto";
   soundOn = D.settings.soundEnabled;
+  applyTheme();
   const active = D.active && D.profiles[D.active] ? D.active : null;
   _lang = D.lang === "bn" ? "bn" : "en";
   if (active) D.active = active;
@@ -462,6 +466,21 @@ function todayKey() {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 let soundOn = true;
+/* theme: "auto" follows the system; "light"/"dark" force. Stored in settings. */
+function applyTheme() {
+  const th = (D && D.settings && D.settings.theme) || "auto";
+  const root = document.documentElement;
+  if (!root || !root.setAttribute) return; // headless smoke test
+  if (th === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", th);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", isDark() ? "#0F1D18" : "#0E3B2E");
+}
+function isDark() {
+  const th = (D && D.settings && D.settings.theme) || "auto";
+  if (th !== "auto") return th === "dark";
+  try { return window.matchMedia("(prefers-color-scheme: dark)").matches; } catch { return false; }
+}
+try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { applyTheme(); const cur = stack[stack.length - 1]; if (cur) render(cur.name, cur.params || {}); }); } catch {}
 let _audioCtx = null;
 function getAudio() {
   if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1796,7 +1815,9 @@ const DIV_PALETTE = {
   khulna: "#2C6E8A", mymensingh: "#8D6E63", rajshahi: "#6A5ACD",
   rangpur: "#C0392B", sylhet: "#189AB4",
 };
-const WATER = "#D7E8F1";
+const WATER = "#D7E8F1", WATER_DARK = "#0E2230";
+const mapInk = () => (isDark() ? { text: "#F1EEE4", halo: "rgba(15,29,24,.85)", stroke: "#0F1D18", reveal: "#F1EEE4", revealBad: "#FF8A80" }
+  : { text: "#0E3B2E", halo: "rgba(255,255,255,.85)", stroke: "#FFFFFF", reveal: "#15553F", revealBad: "#C0392B" });
 function colorForBD(id, kind) {
   if (kind === "bd-d") {
     const d = distIdx[id];
@@ -1821,6 +1842,7 @@ function normalFill(md, id, opts) {
   if (!opts.ok && opts.picked && isT) return "#7FD19F"; // reveal the right answer after a miss
   if (md.kind === "bd" || md.kind === "bd-d") return colorForBD(id, md.kind);
   const c = ctryIdx[id];
+  if (isDark()) return c ? (c.area > 200000 ? "#4E8C63" : c.area > 20000 ? "#5E9B6E" : "#6FA97C") : "#55645A";
   return c ? (c.area > 200000 ? "#9CCF9D" : c.area > 20000 ? "#BFD9A8" : "#D8E6C2") : "#E8E8D5";
 }
 
@@ -1831,10 +1853,11 @@ function drawMap(canvas, md, opts = {}) {
   const v = getView(canvas, md);
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = WATER;
+  ctx.fillStyle = isDark() ? WATER_DARK : WATER;
   ctx.fillRect(0, 0, md.W, md.H);
   ctx.setTransform(dpr * v.k, 0, 0, dpr * v.k, dpr * v.tx, dpr * (v.ty + md.oy * v.k));
   const interact = opts.interact !== "none";
+  const ink = mapInk();
   ctx.lineJoin = "round";
   for (const en of md.entries) {
     const id = en.id;
@@ -1844,11 +1867,11 @@ function drawMap(canvas, md, opts = {}) {
     ctx.fillStyle = normalFill(md, id, opts);
     ctx.fill(en.path);
     if (isHover) { ctx.fillStyle = "rgba(255,255,255,.28)"; ctx.fill(en.path); }
-    ctx.strokeStyle = "#FFFFFF";
+    ctx.strokeStyle = ink.stroke;
     ctx.lineWidth = (md.kind === "world" ? 0.7 : 0.9) / v.k;
     ctx.stroke(en.path);
     if ((isTarget && !interact) || isHover) {
-      ctx.strokeStyle = isPicked && !opts.ok ? "#F49B1F" : "#0E3B2E";
+      ctx.strokeStyle = isPicked && !opts.ok ? "#F49B1F" : (isDark() ? "#F1EEE4" : "#0E3B2E");
       ctx.lineWidth = 3 / v.k;
       ctx.stroke(en.path);
     }
@@ -1873,6 +1896,7 @@ function drawLabels(ctx, canvas, md, v, opts) {
     : md.kind === "bd-d" ? (distIdx[id] ? dname(distIdx[id]) : id)
     : (ctryIdx[id] ? cname(ctryIdx[id]) : "");
   const size = md.kind === "bd" ? 13 : md.kind === "bd-d" ? 10 : 11;
+  const ink = mapInk();
   const cands = [];
   for (const [k, pos] of Object.entries(labels)) {
     const en = md.entries.find((e) => e.key === k) || md.byId[String(md.toId(k))];
@@ -1892,7 +1916,14 @@ function drawLabels(ctx, canvas, md, v, opts) {
   ctx.font = `700 ${px(size)}px 'Noto Sans Bengali', sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const placed = [];
+  // reserve the on-canvas UI (zoom buttons bottom-right, hint pill bottom-left)
+  // so labels never sit under them, whatever the zoom
+  const toPath = (sx, sy) => [(sx - v.tx) / v.k, (sy - v.ty) / v.k - md.oy];
+  const cssW = canvas.clientWidth || md.W, cssH = canvas.clientHeight || (md.H * cssScale);
+  const S = (n) => n / cssScale; // CSS px -> logical canvas px
+  const ctlTL = toPath(md.W - S(56), md.H - S(140)), ctlBR = toPath(md.W, md.H);
+  const hintTL = toPath(0, md.H - S(44)), hintBR = toPath(S(Math.min(cssW * 0.7, 260)), md.H);
+  const placed = [[ctlTL[0], ctlTL[1], ctlBR[0], ctlBR[1]], [hintTL[0], hintTL[1], hintBR[0], hintBR[1]]];
   const minLand = md.kind === "world" ? 26 : 0; // CSS px of land needed before a country gets a label
   for (const c of cands) {
     if (c.wCss < minLand && md.kind === "world") continue;
@@ -1900,9 +1931,9 @@ function drawLabels(ctx, canvas, md, v, opts) {
     const r = [c.x - w / 2 - px(3), c.y - h / 2, c.x + w / 2 + px(3), c.y + h / 2];
     if (placed.some((p) => r[0] < p[2] && r[2] > p[0] && r[1] < p[3] && r[3] > p[1])) continue;
     placed.push(r);
-    ctx.lineWidth = px(3); ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineJoin = "round";
+    ctx.lineWidth = px(3); ctx.strokeStyle = ink.halo; ctx.lineJoin = "round";
     ctx.strokeText(c.txt, c.x, c.y);
-    ctx.fillStyle = "#0E3B2E";
+    ctx.fillStyle = ink.text;
     ctx.fillText(c.txt, c.x, c.y);
   }
   // revealed answer after a quiz: label it big
@@ -1911,9 +1942,9 @@ function drawLabels(ctx, canvas, md, v, opts) {
     const pos = en && (labels[en.key] || [(en.main[0] + en.main[2]) / 2, (en.main[1] + en.main[3]) / 2 - md.oy]);
     if (pos) {
       ctx.font = `800 ${px(size + 4)}px 'Noto Sans Bengali', sans-serif`;
-      ctx.lineWidth = px(4); ctx.strokeStyle = "rgba(255,255,255,.95)";
+      ctx.lineWidth = px(4); ctx.strokeStyle = ink.halo;
       ctx.strokeText(nameOf(en.id), pos[0], pos[1] - px(size + 6));
-      ctx.fillStyle = opts.ok ? "#15553F" : "#C0392B";
+      ctx.fillStyle = opts.ok ? ink.reveal : ink.revealBad;
       ctx.fillText(nameOf(en.id), pos[0], pos[1] - px(size + 6));
     }
   }
@@ -2102,6 +2133,10 @@ function screenParent() {
         <button class="switch ${D.settings.soundEnabled ? "on" : ""}" data-action="p-sound"></button>
       </div>
       <div class="setting">
+        <span><span class="tt">🌙 ${t("theme")}</span><br><span class="ds">${t("themeSub")}</span></span>
+        <span class="seg">${["auto", "light", "dark"].map((v) => `<button class="${D.settings.theme === v ? "on" : ""}" data-action="p-theme" data-v="${v}">${t("theme_" + v)}</button>`).join("")}</span>
+      </div>
+      <div class="setting">
         <span><span class="tt">${t("langLock")}</span><br><span class="ds">${t("langLockSub")}</span></span>
         <button class="switch ${D.settings.lockLang ? "on" : ""}" data-action="p-lock"></button>
       </div>
@@ -2138,6 +2173,7 @@ function screenParent() {
 }
 MOUNT.parent = (params) => {
   bindAction(APP, "p-sound", (e) => { D.settings.soundEnabled = !D.settings.soundEnabled; soundOn = D.settings.soundEnabled; save(); if (soundOn) sfx("tap"); render("parent"); });
+  bindAction(APP, "p-theme", (e, btn) => { D.settings.theme = btn.getAttribute("data-v"); save(); applyTheme(); render("parent"); });
   bindAction(APP, "p-lock", (e) => { D.settings.lockLang = !D.settings.lockLang; save(); render("parent"); });
   bindAction(APP, "p-clear", (e) => {
     if (!confirm(t("confirmClear"))) return;
