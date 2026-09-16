@@ -78,9 +78,14 @@ const CACHE = "geo-buddy-${version}";
 const PRECACHE = ${JSON.stringify(precacheFiles)};
 
 self.addEventListener("install", (e) => {
+  // cache: "reload" bypasses the browser's HTTP cache so a new worker never
+  // precaches a stale copy of a file it is supposed to be updating
   e.waitUntil(
     caches.open(CACHE)
-      .then((c) => c.addAll(PRECACHE))
+      .then((c) => Promise.all(PRECACHE.map((u) => fetch(u, { cache: "reload" }).then((r) => {
+        if (!r.ok) throw new Error("precache " + u + " " + r.status);
+        return c.put(u, r);
+      }))))
       .then(() => self.skipWaiting())
   );
 });

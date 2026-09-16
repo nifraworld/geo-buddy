@@ -1,0 +1,10 @@
+# Cloudflare Pages headers. The service worker and the shell must always be
+# revalidated, or a new build can sit behind a 4-hour edge/browser cache.
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/
+  Cache-Control: no-cache, must-revalidate
+/index.html
+  Cache-Control: no-cache, must-revalidate
+/manifest.json
+  Cache-Control: no-cache, must-revalidate
