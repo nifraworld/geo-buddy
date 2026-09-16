@@ -106,7 +106,9 @@ for (const ty of ["bd-hq", "bd-fact", "bd-find", "d-div", "div-d", "d-find", "wf
 // builder for world types
 for (const ty of ["wf", "wc", "wh", "hc", "world-find"]) {
   const qs = T.countryQuestions(ty);
-  assert(qs.length === 194, ty + " builds 194");
+  const mapped = GEO.countries.filter((c) => c.hasMap !== false).length;
+  assert(qs.length === (ty === "world-find" ? mapped : 194), ty + " builds " + (ty === "world-find" ? mapped + " (mapped countries only)" : 194));
+  if (ty === "world-find") assert(mapped < 194 && qs.every((q) => GEO.countries.find((c) => c.id === q.answerId).hasMap !== false), "no find-on-map question for a country absent from the map");
   const q = qs[0];
   assert(q.type === ty, ty + " type kept");
   if (q.kind !== "map") {

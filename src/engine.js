@@ -611,6 +611,9 @@ function render(name, params) {
     daily: screenDaily, parent: screenParent, pin: screenPin, about: screenAbout,
     custom: screenCustom, clock: screenClock,
   }[name];
+  // leaving the quiz screen abandons the session: its answer/next timers must
+  // not append the next question onto whatever screen is shown now
+  if (name !== "session" && S && !S.over) { S.over = true; clearInterval(_clockT); }
   const top = name === "welcome" || name === "pin" ? `<div class="site-tag-float">${siteTag()}</div>` : fillTopbar(name !== "who");
   document.title = name === "map" ? "Map — Geo Buddy" : "Geo Buddy";
   const node = sub(params);
@@ -1102,7 +1105,10 @@ function countryQuestions(ty) {
     if (ty === "wc") return { type: "wc", kind: "flagchoice", answerId: c.id, prompt: tvar("qprompts.wc", { X: cname(c) }), choices: fillChoices(CTRY, c, (x) => cname(x), { asFlag: true, regionBias: true }) };
     if (ty === "wh") return { type: "wh", kind: "text", answerId: c.id, prompt: tvar("qprompts.wh", { X: cname(c) }), choices: fillChoices(CTRY, c, (x) => cap(x), { uniq: "cap", regionBias: true }) };
     if (ty === "hc") return { type: "hc", kind: "text", answerId: c.id, prompt: tvar("qprompts.hc", { X: cap(c) }), choices: fillChoices(CTRY, c, (x) => cname(x), { regionBias: true }) };
-    if (ty === "world-find") return { type: "world-find", kind: "map", map: "world", answerId: c.id, prompt: tvar("findPromptWorld", { X: cname(c) }) };
+    if (ty === "world-find") {
+      if (c.hasMap === false) return null; // microstates/islands absent from the 110m map — can't be tapped
+      return { type: "world-find", kind: "map", map: "world", answerId: c.id, prompt: tvar("findPromptWorld", { X: cname(c) }) };
+    }
     return null;
   }).filter(Boolean);
 }
@@ -1226,7 +1232,8 @@ function mapQuestionHTML(s, q, n) {
   return `${qHead(s)}${qBar(s)}
     <div class="q-prompt">${q.prompt}</div>
     <div class="map-wrap">
-      <canvas class="map-canvas" data-mapcanvas="1" width="${q.map === "bd" || q.map === "bd-d" ? 640 : 900}" height="${q.map === "bd" || q.map === "bd-d" ? 840 : 460}"></canvas>
+      <canvas class="map-canvas" data-mapcanvas="1" width="${q.map === "world" ? 900 : 640}" height="${q.map === "world" ? 640 : 840}"></canvas>
+      ${mapControlsHTML()}
       <div class="map-hint">${t("map.hint.quiz")}</div>
     </div>`;
 }
@@ -1242,13 +1249,17 @@ function mountChoiceQuestion(s, q) {
 function mountMapQuestion(s, q) {
   const canvas = APP.querySelector("[data-mapcanvas]");
   const md = makeMapModel(q.map);
-  drawMap(canvas, md, { interact: md.kind, target: q.answerId, mode: "quiz" });
-  canvas.addEventListener("pointerdown", (e) => {
-    if (s.answered !== s.idx) return;
-    const pt = evToCanvas(canvas, md, e);
-    const hit = md.hit(pt.x, pt.y);
-    if (!hit) return;
-    answerSession(s, q, hit, canvas, q.answerId);
+  // open on the answer's region so the target is tappable on a phone
+  viewFit(canvas, md, quizFrameBBox(md, q.answerId), 0.18, 6);
+  const redraw = () => drawMap(canvas, md, canvas._quizOpts || { interact: md.kind, target: q.answerId, mode: "quiz" });
+  canvas._quizOpts = null;
+  redraw();
+  attachMapGestures(canvas, md, {
+    redraw,
+    tap: (hit) => {
+      if (s.answered !== s.idx || !hit) return;
+      answerSession(s, q, hit, canvas, q.answerId);
+    },
   });
 }
 function answerSession(s, q, pick, spot, correctId) {
@@ -1267,7 +1278,7 @@ function answerSession(s, q, pick, spot, correctId) {
   applyFeedback(q, ok, pick, spot);
   if (ok) sfx("correct"); else sfx("wrong");
   if (S.conf.clock && ok) { stopClockForNiceMoment(); }
-  setTimeout(() => { s.idx++; showNext(S); }, ok ? 950 : 1800);
+  setTimeout(() => { if (s.over) return; s.idx++; showNext(s); }, ok ? 950 : 1800);
 }
 function bumpAndStars(p, q, ok) {
   const ansId = q.itemId || q.answerId;
@@ -1284,7 +1295,19 @@ function applyFeedback(q, ok, pick, spot) {
     const canvas = APP.querySelector("[data-mapcanvas]");
     if (canvas) {
       const md = makeMapModel(q.map);
-      drawMap(canvas, md, { interact: "none", target: q.answerId, picked: pick, ok, mode: "quiz" });
+      canvas._quizOpts = { interact: "none", target: q.answerId, picked: pick, ok, mode: "quiz" };
+      const ctl = canvas.closest(".map-wrap")?.querySelector(".map-ctl");
+      if (ctl) ctl.classList.add("hidden");
+      const redraw = () => drawMap(canvas, md, canvas._quizOpts);
+      redraw();
+      // glide to the answer (and the miss, if any) so the child sees where it is
+      const box = md.bboxOf([q.answerId, pick].filter(Boolean));
+      if (box) {
+        const cur = { ...getView(canvas, md) };
+        const to = { ...viewFit(canvas, md, box, 0.6, md.kind === "world" ? 5 : 2.2) };
+        canvas._view = cur;
+        viewAnimateTo(canvas, md, to, redraw, 500);
+      }
     }
   } else {
     APP.querySelectorAll(".choice").forEach((btn) => {
@@ -1423,30 +1446,73 @@ MOUNT.results = (params) => {
   });
 };
 
-/* ================= map model + canvas ================= */
+/* ================= map model + canvas =================
+   One model per map kind (bd / bd-d / world): Path2D per region, a bounding
+   box per region (parsed once from the path string) and a hit test in
+   logical coordinates. Every canvas carries its own view {k, tx, ty}
+   (screen = logical * k + t, in CSS px of the logical canvas), so a redraw
+   after an answer keeps whatever the child zoomed to. */
 let MODEL_CACHE = {};
+function pathBBox(d) {
+  const n = d.match(/-?\d+(?:\.\d+)?/g);
+  if (!n) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i + 1 < n.length; i += 2) {
+    const x = +n[i], y = +n[i + 1];
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return [x0, y0, x1, y1];
+}
+/* bbox of the largest ring only — France without French Guiana, the US
+   without Alaska/Hawaii — so framing and labels follow the mainland */
+function pathMainBBox(d) {
+  let best = null, bestA = -1;
+  for (const ring of d.split(/(?=M)/)) {
+    const b = pathBBox(ring);
+    if (!b) continue;
+    const a = (b[2] - b[0]) * (b[3] - b[1]);
+    if (a > bestA) { bestA = a; best = b; }
+  }
+  return best;
+}
 function makeMapModel(kind) {
   if (MODEL_CACHE[kind]) return MODEL_CACHE[kind];
   const src = kind === "bd" ? BD_MAP : kind === "bd-d" ? BD_MAP_D : WORLD_MAP;
   const W = kind === "bd" || kind === "bd-d" ? 640 : 900;
-  const H = kind === "bd" || kind === "bd-d" ? 840 : 460;
+  // the world paths are baked into 900×460; give them water above and below so
+  // the viewport is taller on a phone (oy = content offset inside the canvas)
+  const H = kind === "bd" || kind === "bd-d" ? 840 : 640;
+  const oy = kind === "world" ? (640 - 460) / 2 : 0;
+  const shift = (b) => b && [b[0], b[1] + oy, b[2], b[3] + oy];
+  const divBase = { "Barishal": "barishal", "Chattogram": "chattogram", "Dhaka": "dhaka", "Khulna": "khulna", "Rajshahi": "rajshahi", "Rangpur": "rangpur", "Sylhet": "sylhet", "Mymensingh": "mymensingh" };
+  const toId = (k) => (kind === "bd" ? (divBase[k] || k) : kind === "bd-d" ? k : dbMapsKeyToId(k));
   const entries = Object.entries(src).map(([k, d]) => {
-    const key = kind === "bd" || kind === "bd-d" ? k : String(k);
     let path;
     try { path = new Path2D(d); } catch { path = null; }
-    return { key, d, path };
-  }).filter((x) => x.path);
-  const model = { kind, W, H, entries };
-  const divBase = { "Barishal": "barishal", "Chattogram": "chattogram", "Dhaka": "dhaka", "Khulna": "khulna", "Rajshahi": "rajshahi", "Rangpur": "rangpur", "Sylhet": "sylhet", "Mymensingh": "mymensingh" };
-  model.toId = (k) => (kind === "bd" ? (divBase[k] || k) : kind === "bd-d" ? k : dbMapsKeyToId(k));
+    return { key: k, id: toId(k), d, path, bbox: shift(pathBBox(d)), main: shift(pathMainBBox(d) || pathBBox(d)) };
+  }).filter((x) => x.path && x.bbox);
+  const byId = {};
+  for (const en of entries) byId[String(en.id)] = en;
+  const model = { kind, W, H, oy, entries, byId, toId, kMax: kind === "world" ? 14 : 6 };
   model.scratch = document.createElement("canvas").getContext("2d"); // identity CTM: logical coords
   model.hit = (x, y) => {
     for (let i = model.entries.length - 1; i >= 0; i--) {
       const en = model.entries[i];
-      if (!en.path) continue;
-      try { if (model.scratch.isPointInPath(en.path, x, y)) return model.toId(en.key); } catch {}
+      const b = en.bbox;
+      if (x < b[0] || x > b[2] || y < b[1] || y > b[3]) continue;
+      try { if (model.scratch.isPointInPath(en.path, x, y - oy)) return en.id; } catch {}
     }
     return null;
+  };
+  model.bboxOf = (ids) => { // union of mainland boxes
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const id of ids) {
+      const en = model.byId[String(id)];
+      if (!en) continue;
+      const b = en.main;
+      if (b[0] < x0) x0 = b[0]; if (b[1] < y0) y0 = b[1]; if (b[2] > x1) x1 = b[2]; if (b[3] > y1) y1 = b[3];
+    }
+    return x0 === Infinity ? null : [x0, y0, x1, y1];
   };
   MODEL_CACHE[kind] = model;
   return model;
@@ -1456,11 +1522,159 @@ function dbMapsKeyToId(k) {
   for (const c of CTRY) if (c.id === k || c.id.replace(/^0+/, "") === k.replace(/^0+/, "")) return c.id;
   return k;
 }
+
+/* ---------- view (pan / zoom) ---------- */
+function getView(canvas, md) {
+  if (!canvas._view) canvas._view = { k: 1, tx: 0, ty: 0 };
+  return clampView(canvas._view, md);
+}
+function clampView(v, md) {
+  v.k = Math.max(1, Math.min(md.kMax, v.k));
+  // never show empty space beyond the map edge
+  v.tx = Math.min(0, Math.max(md.W - md.W * v.k, v.tx));
+  v.ty = Math.min(0, Math.max(md.H - md.H * v.k, v.ty));
+  return v;
+}
+function viewReset(canvas, md) { canvas._view = { k: 1, tx: 0, ty: 0 }; return canvas._view; }
+/* zoom so `bbox` (logical) fills the canvas with `pad` (fraction) of breathing room */
+function viewFit(canvas, md, bbox, pad = 0.25, kCap) {
+  if (!bbox) return viewReset(canvas, md);
+  const bw = Math.max(1, bbox[2] - bbox[0]), bh = Math.max(1, bbox[3] - bbox[1]);
+  let k = Math.min(md.W / (bw * (1 + pad * 2)), md.H / (bh * (1 + pad * 2)));
+  k = Math.max(1, Math.min(kCap || md.kMax, k));
+  const cx = (bbox[0] + bbox[2]) / 2, cy = (bbox[1] + bbox[3]) / 2;
+  canvas._view = clampView({ k, tx: md.W / 2 - cx * k, ty: md.H / 2 - cy * k }, md);
+  return canvas._view;
+}
+/* zoom by factor `f` keeping logical point under (sx, sy) fixed; sx/sy in logical-canvas CSS px */
+function viewZoomAt(canvas, md, f, sx, sy) {
+  const v = getView(canvas, md);
+  const k2 = Math.max(1, Math.min(md.kMax, v.k * f));
+  const lx = (sx - v.tx) / v.k, ly = (sy - v.ty) / v.k;
+  v.k = k2; v.tx = sx - lx * k2; v.ty = sy - ly * k2;
+  return clampView(v, md);
+}
+/* smooth glide of the view to `target`, redrawing via `draw()` each frame */
+function viewAnimateTo(canvas, md, target, draw, ms = 420) {
+  const from = { ...getView(canvas, md) };
+  const to = clampView({ ...target }, md);
+  const t0 = performance.now();
+  cancelAnimationFrame(canvas._anim);
+  const step = (now) => {
+    const u = Math.min(1, (now - t0) / ms);
+    const e = 1 - Math.pow(1 - u, 3);
+    canvas._view = { k: from.k + (to.k - from.k) * e, tx: from.tx + (to.tx - from.tx) * e, ty: from.ty + (to.ty - from.ty) * e };
+    draw();
+    if (u < 1) canvas._anim = requestAnimationFrame(step);
+  };
+  canvas._anim = requestAnimationFrame(step);
+}
+/* client event -> logical-canvas CSS px (before the view), then -> map logical coords */
+function evToScreen(canvas, md, e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (md.W / r.width), y: (e.clientY - r.top) * (md.H / r.height) };
+}
+function evToCanvas(canvas, md, e) {
+  const s = evToScreen(canvas, md, e);
+  const v = getView(canvas, md);
+  return { x: (s.x - v.tx) / v.k, y: (s.y - v.ty) / v.k };
+}
+/* Pointer gestures for a map canvas: tap (no drag), drag-pan, pinch, wheel,
+   double-tap zoom and the +/−/⟲ buttons inside the same .map-wrap.
+   `on.tap(id, pt)`, `on.hover(id)` (mouse only), `on.redraw()`. */
+function attachMapGestures(canvas, md, on) {
+  const ptrs = new Map();
+  let dragging = false, moved = false, lastTap = 0, pinch0 = null;
+  const redraw = () => on.redraw();
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    ptrs.set(e.pointerId, evToScreen(canvas, md, e));
+    moved = false; dragging = true;
+    if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()];
+      pinch0 = { d: Math.hypot(a.x - b.x, a.y - b.y), k: getView(canvas, md).k, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+    }
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!ptrs.has(e.pointerId)) {
+      if (e.pointerType === "mouse" && on.hover) { const p = evToCanvas(canvas, md, e); on.hover(md.hit(p.x, p.y)); }
+      return;
+    }
+    const prev = ptrs.get(e.pointerId);
+    const cur = evToScreen(canvas, md, e);
+    ptrs.set(e.pointerId, cur);
+    const v = getView(canvas, md);
+    if (ptrs.size === 2 && pinch0) {
+      const [a, b] = [...ptrs.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      const f = (pinch0.k * (d / pinch0.d)) / v.k;
+      const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+      viewZoomAt(canvas, md, f, cx, cy);
+      v.tx += cx - pinch0.cx; v.ty += cy - pinch0.cy; pinch0.cx = cx; pinch0.cy = cy;
+      clampView(v, md); moved = true; redraw();
+      return;
+    }
+    const dx = cur.x - prev.x, dy = cur.y - prev.y;
+    if (!moved && Math.hypot(dx, dy) * (canvas.clientWidth / md.W) < 6) return; // tap tolerance in CSS px
+    moved = true;
+    if (v.k > 1) { v.tx += dx; v.ty += dy; clampView(v, md); redraw(); }
+  });
+  const end = (e) => {
+    if (!ptrs.has(e.pointerId)) return;
+    const pt = ptrs.get(e.pointerId);
+    ptrs.delete(e.pointerId);
+    if (ptrs.size < 2) pinch0 = null;
+    if (ptrs.size) return;
+    dragging = false;
+    if (moved) return;
+    const now = performance.now();
+    if (now - lastTap < 320) { // double tap: zoom in around the point
+      lastTap = 0;
+      const v = getView(canvas, md);
+      const target = { ...viewZoomAt(canvas, md, v.k >= md.kMax ? 1 / v.k : 2.2, pt.x, pt.y) };
+      canvas._view = { ...v };
+      viewAnimateTo(canvas, md, target, redraw);
+      return;
+    }
+    lastTap = now;
+    if (on.tap) { const v = getView(canvas, md); on.tap(md.hit((pt.x - v.tx) / v.k, (pt.y - v.ty) / v.k), pt); }
+  };
+  canvas.addEventListener("pointerup", end);
+  canvas.addEventListener("pointercancel", end);
+  canvas.addEventListener("pointerleave", (e) => { if (!ptrs.size && on.hover && e.pointerType === "mouse") on.hover(null); });
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const s = evToScreen(canvas, md, e);
+    viewZoomAt(canvas, md, e.deltaY < 0 ? 1.18 : 1 / 1.18, s.x, s.y);
+    redraw();
+  }, { passive: false });
+  const wrap = canvas.closest(".map-wrap");
+  if (wrap) {
+    wrap.querySelectorAll("[data-mapctl]").forEach((b) => b.addEventListener("click", () => {
+      const what = b.getAttribute("data-mapctl");
+      const v = getView(canvas, md);
+      const from = { ...v };
+      const to = what === "reset" ? { k: 1, tx: 0, ty: 0 } : { ...viewZoomAt(canvas, md, what === "in" ? 1.6 : 1 / 1.6, md.W / 2, md.H / 2) };
+      canvas._view = from;
+      viewAnimateTo(canvas, md, to, redraw, 260);
+    }));
+  }
+}
+function mapControlsHTML() {
+  return `<div class="map-ctl">
+    <button type="button" data-mapctl="in" aria-label="Zoom in">+</button>
+    <button type="button" data-mapctl="out" aria-label="Zoom out">−</button>
+    <button type="button" data-mapctl="reset" aria-label="Reset">⟲</button>
+  </div>`;
+}
+
+/* ---------- colours ---------- */
 const DIV_PALETTE = {
   barishal: "#E9C46A", chattogram: "#F49B1F", dhaka: "#2FA56A",
   khulna: "#2C6E8A", mymensingh: "#8D6E63", rajshahi: "#6A5ACD",
   rangpur: "#C0392B", sylhet: "#189AB4",
 };
+const WATER = "#D7E8F1";
 function colorForBD(id, kind) {
   if (kind === "bd-d") {
     const d = distIdx[id];
@@ -1478,93 +1692,46 @@ function tint(hex, light) {
   const nb = Math.round(b + (255 - b) * (1 - light));
   return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
 }
+function normalFill(md, id, opts) {
+  const isT = String(id) === String(opts.target);
+  if (opts.ok && isT) return "#2FA56A";
+  if (opts.picked && String(id) === String(opts.picked) && !opts.ok) return "#F49B1F";
+  if (!opts.ok && opts.picked && isT) return "#7FD19F"; // reveal the right answer after a miss
+  if (md.kind === "bd" || md.kind === "bd-d") return colorForBD(id, md.kind);
+  const c = ctryIdx[id];
+  return c ? (c.area > 200000 ? "#9CCF9D" : c.area > 20000 ? "#BFD9A8" : "#D8E6C2") : "#E8E8D5";
+}
+
+/* ---------- drawing ---------- */
 function drawMap(canvas, md, opts = {}) {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  canvas.width = md.W * dpr;
-  canvas.height = md.H * dpr;
+  if (canvas.width !== md.W * dpr) { canvas.width = md.W * dpr; canvas.height = md.H * dpr; }
+  const v = getView(canvas, md);
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, md.W, md.H);
-  ctx.fillStyle = "#EAF4E4";
+  ctx.fillStyle = WATER;
   ctx.fillRect(0, 0, md.W, md.H);
+  ctx.setTransform(dpr * v.k, 0, 0, dpr * v.k, dpr * v.tx, dpr * (v.ty + md.oy * v.k));
   const interact = opts.interact !== "none";
-  const labelOn = opts.labels !== false;
   ctx.lineJoin = "round";
-  const divOf = (id) => {
-    if (md.kind === "bd") return String(id || "").toLowerCase();
-    if (md.kind === "bd-d") {
-      const d = distIdx[id];
-      return d ? d.div : String(id || "").toLowerCase();
-    }
-    const c = ctryIdx[id]; return c ? c.id : id;
-  };
   for (const en of md.entries) {
-    const id = md.toId(en.key);
+    const id = en.id;
     const isTarget = String(id) === String(opts.target);
     const isPicked = String(id) === String(opts.picked);
-    ctx.beginPath();
+    const isHover = opts.hover != null && String(id) === String(opts.hover);
     ctx.fillStyle = normalFill(md, id, opts);
-    ctx.strokeStyle = "#FFFFFF";
-    ctx.lineWidth = isTarget || isPicked ? 2.5 : 0.9;
     ctx.fill(en.path);
-    if (interact) {
-      ctx.lineWidth = 0.9;
-      ctx.stroke(en.path);
-    }
-    if (isTarget) {
+    if (isHover) { ctx.fillStyle = "rgba(255,255,255,.28)"; ctx.fill(en.path); }
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.lineWidth = (md.kind === "world" ? 0.7 : 0.9) / v.k;
+    ctx.stroke(en.path);
+    if ((isTarget && !interact) || isHover) {
       ctx.strokeStyle = isPicked && !opts.ok ? "#F49B1F" : "#0E3B2E";
-      ctx.lineWidth = 3.2;
+      ctx.lineWidth = 3 / v.k;
       ctx.stroke(en.path);
     }
   }
-  // labels
-  if (labelOn && md.kind === "bd") {
-    ctx.fillStyle = "#0E3B2E";
-    ctx.font = "700 15px 'Noto Sans Bengali', sans-serif";
-    ctx.textAlign = "center";
-    for (const [k, [x, y]] of Object.entries(BD_LABELS)) {
-      const en = md.entries.find((e) => e.key === k);
-      if (!en) continue;
-      const id = md.toId(k);
-      if (interact && id === opts.target) continue; // user must find it; hide target label
-      ctx.fillText(_lang === "bn" ? (divIdx[id] ? divIdx[id].bn : k) : k, x, y + 9);
-    }
-  }
-  if (labelOn && md.kind === "bd-d") {
-    ctx.fillStyle = "#0E3B2E";
-    ctx.font = "600 11px 'Noto Sans Bengali', sans-serif";
-    ctx.textAlign = "center";
-    for (const [k, [x, y]] of Object.entries(BD_LABELS_D)) {
-      const id = md.toId(k);
-      if (interact && id === opts.target) continue;
-      const d = distIdx[id];
-      ctx.fillText(d ? dname(d) : k, x, y + 4);
-    }
-  }
-  if (labelOn && md.kind === "world") {
-    ctx.fillStyle = "rgba(14,59,46,.85)";
-    ctx.font = "600 13px 'Noto Sans Bengali', sans-serif";
-    ctx.textAlign = "center";
-    const shown = new Set();
-    for (const id of bigCountries()) {
-      if (shown.has(id)) continue;
-      const key = findWorldKey(id);
-      const lb = WORLD_LABELS[key];
-      if (!lb) continue;
-      if (String(id) === String(opts.target)) continue;
-      shown.add(id);
-      ctx.fillText(cname(ctryIdx[id]), lb[0], lb[1] + 4);
-    }
-    // overlay target hint when not interactive
-    if (!interact && opts.target) {
-      const key = findWorldKey(opts.target);
-      const lb = WORLD_LABELS[key];
-      if (lb) {
-        ctx.font = "700 15px 'Noto Sans Bengali', sans-serif";
-        ctx.fillText(cname(ctryIdx[opts.target]), lb[0], lb[1] - 8);
-      }
-    }
-  }
+  if (opts.labels !== false) drawLabels(ctx, canvas, md, v, opts);
   // legend
   const legend = APP.querySelector(".map-legend");
   if (legend) {
@@ -1573,27 +1740,81 @@ function drawMap(canvas, md, opts = {}) {
       : "";
   }
 }
-function normalFill(md, id, opts) {
-  if (opts.ok && (md.kind === "bd" || md.kind === "bd-d") && String(id) === String(opts.target)) return "#2FA56A";
-  if (opts.ok && md.kind === "world" && String(id) === String(opts.target)) return "#2FA56A";
-  if (opts.picked && String(id) === String(opts.picked) && !opts.ok) return "#F49B1F";
-  if (md.kind === "bd" || md.kind === "bd-d") return colorForBD(id, md.kind);
-  const c = ctryIdx[id];
-  const tier = c ? (c.area > 200000 ? "#9CCF9D" : c.area > 20000 ? "#BFD9A8" : "#D8E6C2") : "#E8E8D5";
-  return tier;
-}
-function bigCountries() {
-  return CTRY.filter((c) => c.area > 300000).map((c) => c.id);
+/* Labels are sized in on-screen CSS px (not map units) so they stay readable
+   at every zoom, and placed greedily biggest-first so none overlap; zooming
+   in makes room for more. The quiz target is never labelled. */
+function drawLabels(ctx, canvas, md, v, opts) {
+  const cssScale = (canvas.clientWidth || md.W) / md.W; // logical px -> CSS px
+  const px = (n) => n / (cssScale * v.k);                 // CSS px -> map units at this zoom
+  const labels = md.kind === "bd" ? BD_LABELS : md.kind === "bd-d" ? BD_LABELS_D : WORLD_LABELS;
+  const nameOf = (id) => md.kind === "bd" ? (divIdx[id] ? name(divIdx[id]) : id)
+    : md.kind === "bd-d" ? (distIdx[id] ? dname(distIdx[id]) : id)
+    : (ctryIdx[id] ? cname(ctryIdx[id]) : "");
+  const size = md.kind === "bd" ? 13 : md.kind === "bd-d" ? 10 : 11;
+  const cands = [];
+  for (const [k, pos] of Object.entries(labels)) {
+    const en = md.entries.find((e) => e.key === k) || md.byId[String(md.toId(k))];
+    if (!en) continue;
+    const id = en.id;
+    if (opts.interact !== "none" && String(id) === String(opts.target)) continue;
+    const txt = nameOf(id);
+    if (!txt) continue;
+    const b = en.main; // canvas space (already includes md.oy)
+    // visible part only
+    const sx0 = b[0] * v.k + v.tx, sx1 = b[2] * v.k + v.tx, sy0 = b[1] * v.k + v.ty, sy1 = b[3] * v.k + v.ty;
+    if (sx1 < 0 || sx0 > md.W || sy1 < 0 || sy0 > md.H) continue;
+    const wCss = (b[2] - b[0]) * v.k * cssScale;
+    cands.push({ id, txt, x: pos[0], y: pos[1], area: (b[2] - b[0]) * (b[3] - b[1]), wCss });
+  }
+  cands.sort((a, b) => b.area - a.area);
+  ctx.font = `700 ${px(size)}px 'Noto Sans Bengali', sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const placed = [];
+  const minLand = md.kind === "world" ? 26 : 0; // CSS px of land needed before a country gets a label
+  for (const c of cands) {
+    if (c.wCss < minLand && md.kind === "world") continue;
+    const w = ctx.measureText(c.txt).width, h = px(size) * 1.25;
+    const r = [c.x - w / 2 - px(3), c.y - h / 2, c.x + w / 2 + px(3), c.y + h / 2];
+    if (placed.some((p) => r[0] < p[2] && r[2] > p[0] && r[1] < p[3] && r[3] > p[1])) continue;
+    placed.push(r);
+    ctx.lineWidth = px(3); ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineJoin = "round";
+    ctx.strokeText(c.txt, c.x, c.y);
+    ctx.fillStyle = "#0E3B2E";
+    ctx.fillText(c.txt, c.x, c.y);
+  }
+  // revealed answer after a quiz: label it big
+  if (opts.interact === "none" && opts.target != null) {
+    const en = md.byId[String(opts.target)];
+    const pos = en && (labels[en.key] || [(en.main[0] + en.main[2]) / 2, (en.main[1] + en.main[3]) / 2 - md.oy]);
+    if (pos) {
+      ctx.font = `800 ${px(size + 4)}px 'Noto Sans Bengali', sans-serif`;
+      ctx.lineWidth = px(4); ctx.strokeStyle = "rgba(255,255,255,.95)";
+      ctx.strokeText(nameOf(en.id), pos[0], pos[1] - px(size + 6));
+      ctx.fillStyle = opts.ok ? "#15553F" : "#C0392B";
+      ctx.fillText(nameOf(en.id), pos[0], pos[1] - px(size + 6));
+    }
+  }
 }
 function findWorldKey(id) {
   const want = String(id).replace(/^0+/, "");
   for (const k of Object.keys(WORLD_MAP)) if (k.replace(/^0+/, "") === want) return k;
   return id;
 }
-function evToCanvas(canvas, md, e) {
-  const r = canvas.getBoundingClientRect();
-  // logical canvas coordinates (Path2D space), independent of devicePixelRatio & CSS scaling
-  return { x: (e.clientX - r.left) * (md.W / r.width), y: (e.clientY - r.top) * (md.H / r.height) };
+/* framing for a find-on-map question: the region around the answer (sub-region
+   for small countries), so a phone screen can actually hit the target */
+function quizFrameBBox(md, answerId) {
+  if (md.kind !== "world") return null;
+  const c = ctryIdx[answerId];
+  if (!c) return null;
+  const useSub = c.area < 150000 && c.subRegion;
+  const peers = CTRY.filter((x) => useSub ? x.subRegion === c.subRegion : x.region === c.region).map((x) => x.id);
+  const box = md.bboxOf(peers);
+  if (!box) return null;
+  // always include the answer itself even if its peers' box somehow misses it
+  const me = md.bboxOf([answerId]);
+  if (me) { box[0] = Math.min(box[0], me[0]); box[1] = Math.min(box[1], me[1]); box[2] = Math.max(box[2], me[2]); box[3] = Math.max(box[3], me[3]); }
+  return box;
 }
 
 /* ---------- map explorer screen ---------- */
@@ -1605,8 +1826,8 @@ function screenMap(params = {}) {
       <button class="chip ${level === "div" ? "on" : ""}" data-action="map-level" data-level="div">🗺️ ${t("levelDivisions")}</button>
       <button class="chip ${level === "dist" ? "on" : ""}" data-action="map-level" data-level="dist">🧩 ${t("levelDistricts")}</button>
     </div>` : "";
-  const W = kind === "bd-d" ? 640 : kind === "bd" ? 640 : 900;
-  const H = kind === "bd-d" ? 840 : kind === "bd" ? 840 : 460;
+  const W = kind === "world" ? 900 : 640;
+  const H = kind === "world" ? 640 : 840;
   return html(`
     <div class="tabs">
       <button class="tab ${kind === "bd" || kind === "bd-d" ? "on" : ""}" data-action="map-kind" data-kind="bd"><img class="tab-flag" src="${flagUrl("bd")}" alt=""> ${t("sectionBD")}</button>
@@ -1615,6 +1836,7 @@ function screenMap(params = {}) {
     ${bdLevel}
     <div class="map-wrap">
       <canvas class="map-canvas" data-mapcanvas="1" width="${W}" height="${H}" style="width:100%"></canvas>
+      ${mapControlsHTML()}
       <div class="map-hint" id="maptip"></div>
     </div>
     <div class="map-legend"></div>
@@ -1625,56 +1847,37 @@ MOUNT.map = (params = {}) => {
   const kind = params.kind === "world" ? "world" : (params.level === "dist" ? "bd-d" : "bd");
   const canvas = APP.querySelector("[data-mapcanvas]");
   const md = makeMapModel(kind);
+  const isBD = kind !== "world";
+  const hintKey = kind === "bd-d" ? "map.hint.bdd" : isBD ? "map.hint.bd" : "map.hint.world";
+  const tip = APP.querySelector("#maptip");
+  const info = APP.querySelector("#mapinfo");
   let hover = null;
-  function redraw() {
-    drawMap(canvas, md, { interact: true, labels: true, mode: "explore" });
-  }
-  redraw();
-  canvas.addEventListener("pointermove", (e) => {
-    const pt = evToCanvas(canvas, md, e);
-    const id = md.hit(pt.x, pt.y);
-    const tip = APP.querySelector("#maptip");
-    const info = APP.querySelector("#mapinfo");
-    const isBD = kind === "bd" || kind === "bd-d";
-    if (id && id !== hover) {
-      hover = id;
-      const nm = isBD ? (kind === "bd-d" ? dname(distIdx[id]) : name(divIdx[id])) : cname(ctryIdx[id]);
-      tip.textContent = nm;
-      redraw();
-      drawLabel(canvas, md, id);
-      info.innerHTML = infoRow(kind === "bd-d" ? distIdx[id] : kind === "bd" ? divIdx[id] : ctryIdx[id], kind);
-    } else if (!id && hover) {
-      hover = null;
-      const hint = t(kind === "bd-d" ? "map.hint.bdd" : isBD ? "map.hint.bd" : "map.hint.world");
-      tip.textContent = hint;
-      redraw();
-      info.innerHTML = `<p style="color:var(--ink-soft)">👆 ${hint}</p>`;
+  const objOf = (id) => kind === "bd-d" ? distIdx[id] : kind === "bd" ? divIdx[id] : ctryIdx[id];
+  const nameOf = (id) => kind === "bd-d" ? dname(distIdx[id]) : kind === "bd" ? name(divIdx[id]) : cname(ctryIdx[id]);
+  const redraw = () => drawMap(canvas, md, { interact: true, labels: true, mode: "explore", hover });
+  const setHover = (id) => {
+    if (id === hover) return;
+    hover = id;
+    if (id && objOf(id)) {
+      tip.textContent = nameOf(id);
+      info.innerHTML = infoRow(objOf(id), kind);
+    } else {
+      tip.textContent = t(hintKey);
+      info.innerHTML = `<p style="color:var(--ink-soft)">👆 ${t(hintKey)}</p>`;
     }
-  });
-  canvas.addEventListener("pointerdown", (e) => {
-    const pt = evToCanvas(canvas, md, e);
-    const id = md.hit(pt.x, pt.y);
-    if (id) go("detail", kind === "world" ? { kind: "c", id } : kind === "bd-d" ? { kind: "z", id } : { kind: "div", id });
+    redraw();
+  };
+  tip.textContent = t(hintKey);
+  redraw();
+  attachMapGestures(canvas, md, {
+    redraw,
+    hover: setHover,
+    tap: (id) => {
+      if (!id || !objOf(id)) return;
+      go("detail", kind === "world" ? { kind: "c", id } : kind === "bd-d" ? { kind: "z", id } : { kind: "div", id });
+    },
   });
 };
-function drawLabel(canvas, md, id) {
-  const ctx = canvas.getContext("2d");
-  const x = 12, y = 26;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  ctx.fillStyle = "rgba(14,59,46,.92)";
-  ctx.fillRect(0, 0, canvas.width / dpr, 44);
-  const isBD = md.kind === "bd" || md.kind === "bd-d";
-  const big = md.kind === "bd" ? name(divIdx[id]) : md.kind === "bd-d" ? dname(distIdx[id]) : cname(ctryIdx[id]);
-  ctx.fillStyle = "#fff";
-  ctx.font = "700 16px 'Noto Sans Bengali', sans-serif";
-  ctx.fillText(big, x, y);
-  ctx.fillStyle = "#FBF3E2";
-  ctx.font = "11px 'Noto Sans Bengali', sans-serif";
-  ctx.fillText(md.kind === "bd"
-    ? t("division")
-    : md.kind === "bd-d" ? t("inDivision", { X: name(divIdx[distIdx[id].div]) })
-    : t("capital") + ": " + cap(ctryIdx[id]), x, y + 14);
-}
 function infoRow(obj, kind) {
   if (kind === "bd") {
     const d = obj;

@@ -108,6 +108,21 @@ geo.nifraworld.com root
     regenerates `sw.js` without re-fetching data.
   - Smoke test asserts prompts/choices are human text, not keys or type ids.
   - Key generator no longer ships the `LICENCE_SECRET` in the file (paste per tab).
+- **V1.5** Maps you can actually use on a phone. ✅
+  - Pan (drag), pinch, wheel and double-tap zoom on all three maps; +/−/⟲ buttons;
+    the view survives redraws so answering never resets it.
+  - Labels sized in on-screen px with greedy collision avoidance — more appear as
+    you zoom, none overlap (world labels were ~5 CSS px and piled up).
+  - Find-on-map (world) opens framed on the answer's region (sub-region for small
+    countries) using each country's *mainland* box (France minus French Guiana);
+    after answering the view glides to the target and the miss.
+  - World viewport padded to 900×640 for a taller map on portrait phones; water tint.
+  - 29 countries absent from the 110m map (Singapore, Maldives, Malta…) no longer
+    appear as impossible find-on-map questions (`hasMap`).
+  - Leaving the quiz screen abandons the session — its timers used to append the
+    next question onto whatever screen came next.
+  - Follow-ups: label anchor audit (Canada/France anchors sit low), Robinson
+    projection, coastline/graticule styling, BD district framing option.
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.
