@@ -72,6 +72,8 @@ const L = {
     "daily.notyet": "Finish today's challenge to earn today's streak.",
     findPromptBD: "Tap {X} on the map", findPromptWorld: "Tap {X} on the map",
     "map.hint.bd": "Tap a division to explore",
+    "map.hint.bdd": "Tap a district to explore",
+    licNeeded: "Ask a parent to activate a key for this section",
     "map.hint.world": "Tap a country to explore",
     "map.hint.quiz": "Tap the correct place on the map",
     back: "Back",
@@ -165,6 +167,8 @@ const L = {
     "daily.notyet": "আজকের চ্যালেঞ্জ শেষ করো, ধারা গড়তে।",
     findPromptBD: "মানচিত্রে {X} স্পর্শ করো", findPromptWorld: "মানচিত্রে {X} স্পর্শ করো",
     "map.hint.bd": "বিভাগে স্পর্শ করো",
+    "map.hint.bdd": "জেলায় স্পর্শ করো",
+    licNeeded: "এই অংশের জন্য অভিভাবককে কী চালু করতে বলো",
     "map.hint.world": "দেশে স্পর্শ করো",
     "map.hint.quiz": "সঠিক স্থানে স্পর্শ করো",
     back: "ফিরে যাও",
@@ -233,7 +237,15 @@ const L = {
   },
 };
 let _lang = "en";
-function t(k) { const v = L[_lang] && L[_lang][k]; if (v !== undefined) return v; return L.en[k] ?? k; }
+function lookup(tbl, k) {
+  if (!tbl) return undefined;
+  if (tbl[k] !== undefined) return tbl[k];
+  const dot = k.indexOf(".");
+  if (dot < 0) return undefined;
+  const head = tbl[k.slice(0, dot)];
+  return head && typeof head === "object" ? head[k.slice(dot + 1)] : undefined;
+}
+function t(k) { const v = lookup(L[_lang], k); if (v !== undefined) return v; const e = lookup(L.en, k); return e !== undefined ? e : k; }
 function tvar(k, map) { let s = t(k); for (const [a, b] of Object.entries(map)) s = s.split("{" + a + "}").join(String(b)); return s; }
 function name(div) { return _lang === "bn" ? div.bn : div.en; }
 function cname(c) { return _lang === "bn" ? c.bn : c.en; }
@@ -376,6 +388,15 @@ async function refreshLicence(silent) {
       save();
     }
   } catch { if (!silent) toast(t("licOffline")); }
+}
+/* true when the licence covers this play scope; otherwise explains and
+   sends the parent to the Licence card */
+function scopeAllowed(scope) {
+  const need = scope === "both" ? ["bd", "wr"] : [scope === "world" ? "wr" : "bd"];
+  if (need.every(hasScope)) return true;
+  toast("🔒 " + t("licNeeded"));
+  go("pin");
+  return false;
 }
 function clearLicence() {
   D.settings.licence = { email: "", key: "", status: "free", plan: "Home", packages: [], deviceLimit: 0, deviceCount: 0, checkedAt: Date.now() };
@@ -562,14 +583,15 @@ function fillTopbar(homeable) {
     ? `<button class="chip-child" data-nav="who" title="${t("profile")}"><span class="av" style="background:${act.avatar.color}">${act.avatar.icon}</span><span class="nm">${act.name.split(" ")[0]}</span><span class="lv" title="${t("level")}">Lv${getLevel(act)}</span></button>`
     : "";
   const lock = D.settings.lockLang;
-  return `<header class="topbar">
+  /* domain + version stay on welcome/PIN (siteTag) and in About; the child-facing
+     bar only holds back · brand · profile · language so it fits a 360px phone */
+  return `<header class="topbar ${homeable && act ? "has-child" : ""}">
     ${stack.length > 1 ? `<button class="tb-btn" data-action="back" title="${t("back")}">←</button>` : ""}
     <a class="brand" href="#" data-nav="home">
       <img class="ico" src="assets/icons/icon-192.png" alt="">
       <span><h1>Geo Buddy</h1><small>${t("brandSub")}</small></span>
     </a>
     ${homeable ? child : ""}
-    ${siteTag()}
     ${lock ? "" : `<button class="tb-btn" data-tb="lang">${t("langSwitch")}</button>`}
   </header>`;
 }
@@ -650,7 +672,7 @@ function screenHome() {
       <span class="avatar" style="background:${act.avatar.color}">${act.avatar.icon}</span>
       <div>
         <div class="greet">${greet}, ${act.name.split(" ")[0]}! 👋</div>
-        <div class="sub">${t("streakFlame")}</div>
+        <div class="sub">${t("tagline")}</div>
       </div>
       <div class="streak"><b>🔥${streak}</b><small>${t("streakFlame")}</small></div>
     </div>
@@ -906,7 +928,7 @@ function screenPlay() {
   return html(`
     <div class="sec-title"><h2>${t("play")}</h2></div>
     <button class="mode-card" style="width:100%;margin:8px 0" data-nav="daily"><div class="em">📅</div><div class="tt">${t("daily")}</div><div class="ds">${t("dailySub")}</div></button>
-    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="bd"><div class="em">🇧🇩</div><div class="tt">${t("scopeBD")}</div><div class="ds">${t("qtypes")["bd-hq"]} · ${t("qtypes")["bd-fact"]} · ${t("qtypes")["bd-find"]}</div></button>
+    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="bd"><div class="em"><img class="em-flag" src="${flagUrl("bd")}" alt=""></div><div class="tt">${t("scopeBD")}</div><div class="ds">${t("qtypes")["bd-hq"]} · ${t("qtypes")["bd-fact"]} · ${t("qtypes")["bd-find"]}</div></button>
     <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="world"><div class="em">🌍</div><div class="tt">${t("scopeWorld")}</div><div class="ds">${t("qtypes")["wf"]} · ${t("qtypes")["wh"]} · ${t("qtypes")["world-find"]}</div></button>
     <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="both"><div class="em">🎲</div><div class="tt">${t("scopeBDWorld")}</div><div class="ds">${t("customSub")}</div></button>
     <button class="mode-card" style="width:100%;margin:8px 0" data-nav="clock"><div class="em">⏱️</div><div class="tt">${t("clock")}</div><div class="ds">${t("clockSub")}</div></button>`);
@@ -960,6 +982,7 @@ MOUNT.custom = (p) => {
   bindAction(APP, "s-count", (e, btn) => { SETUP.count = parseInt(btn.getAttribute("data-count"), 10); render("custom"); });
   bindAction(APP, "s-ada", () => { SETUP.adaptive = !SETUP.adaptive; render("custom"); });
   bindAction(APP, "s-go", () => {
+    if (!scopeAllowed(SETUP.scope)) return;
     const qs = buildQuestionList({ scope: SETUP.scope, types: SETUP.types, count: SETUP.count, adaptive: SETUP.adaptive });
     if (!qs.length) { toast("…"); return; }
     startSession({ title: t("custom"), questions: qs, clock: false, daily: false });
@@ -974,6 +997,7 @@ function screenClock() {
 }
 MOUNT.clock = (p) => {
   bindAction(APP, "clock-go", () => {
+    if (!scopeAllowed("both")) return;
     const qs = buildQuestionList({ scope: "both", types: ALL_TYPES, count: 0, adaptive: false });
     startSession({ title: t("clock"), questions: qs, clock: true, daily: false });
   });
@@ -994,6 +1018,7 @@ function screenDaily() {
 }
 MOUNT.daily = (p) => {
   bindAction(APP, "daily-go", () => {
+    if (!scopeAllowed("both")) return;
     const qs = buildDailyQuestions();
     startSession({ title: t("daily"), questions: qs, clock: false, daily: true });
   });
@@ -1056,7 +1081,7 @@ function distQuestions(ty) {
 function divQuestions(ty) {
   return DIVS.map((d) => {
     if (ty === "bd-hq") {
-      const choices = fillChoices(DIVS, d, (x) => tvar("bd-hq", { X: _lang === "bn" ? x.hqBn : x.hq }));
+      const choices = fillChoices(DIVS, d, (x) => name(x));
       return { type: "bd-hq", kind: "text", answerId: d.id, prompt: tvar("qprompts.bd-hq", { X: _lang === "bn" ? d.hqBn : d.hq }), choices };
     }
     if (ty === "bd-fact") {
@@ -1431,9 +1456,6 @@ function dbMapsKeyToId(k) {
   for (const c of CTRY) if (c.id === k || c.id.replace(/^0+/, "") === k.replace(/^0+/, "")) return c.id;
   return k;
 }
-const PALETTE = {
-  bd: ["#E9C46A", "#F49B1F", "#2FA56A", "#2C6E8A", "#8D6E63", "#6A5ACD", "#C0392B", "#189AB4"],
-};
 const DIV_PALETTE = {
   barishal: "#E9C46A", chattogram: "#F49B1F", dhaka: "#2FA56A",
   khulna: "#2C6E8A", mymensingh: "#8D6E63", rajshahi: "#6A5ACD",
@@ -1446,9 +1468,7 @@ function colorForBD(id, kind) {
     const i = Math.abs(hashStr(id)) % 5;
     return tint(base, 1 - i * 0.10);
   }
-  const pal = PALETTE.bd;
-  const i = Object.keys(divIdx).indexOf(id.toLowerCase());
-  return pal[((i % pal.length) + pal.length) % pal.length];
+  return DIV_PALETTE[String(id).toLowerCase()] || "#DCEFD6";
 }
 function hashStr(s) { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) | 0; return h; }
 function tint(hex, light) {
@@ -1589,7 +1609,7 @@ function screenMap(params = {}) {
   const H = kind === "bd-d" ? 840 : kind === "bd" ? 840 : 460;
   return html(`
     <div class="tabs">
-      <button class="tab ${kind === "bd" || kind === "bd-d" ? "on" : ""}" data-action="map-kind" data-kind="bd">🇧🇩 ${t("sectionBD")}</button>
+      <button class="tab ${kind === "bd" || kind === "bd-d" ? "on" : ""}" data-action="map-kind" data-kind="bd"><img class="tab-flag" src="${flagUrl("bd")}" alt=""> ${t("sectionBD")}</button>
       <button class="tab ${kind === "world" ? "on" : ""}" data-action="map-kind" data-kind="world">🌍 ${t("sectionWorld")}</button>
     </div>
     ${bdLevel}
@@ -1598,7 +1618,7 @@ function screenMap(params = {}) {
       <div class="map-hint" id="maptip"></div>
     </div>
     <div class="map-legend"></div>
-    <div class="card" id="mapinfo"><p style="color:var(--ink-soft)">👆 ${t(kind === "bd" || kind === "bd-d" ? "map.hint.bd" : "map.hint.world")}</p></div>
+    <div class="card" id="mapinfo"><p style="color:var(--ink-soft)">👆 ${t(level === "dist" ? "map.hint.bdd" : kind === "bd" ? "map.hint.bd" : "map.hint.world")}</p></div>
     <div class="btn-row"><button class="btn btn-paper" data-nav="play">🎯 ${t("play")}</button></div>`);
 }
 MOUNT.map = (params = {}) => {
@@ -1625,9 +1645,10 @@ MOUNT.map = (params = {}) => {
       info.innerHTML = infoRow(kind === "bd-d" ? distIdx[id] : kind === "bd" ? divIdx[id] : ctryIdx[id], kind);
     } else if (!id && hover) {
       hover = null;
-      tip.textContent = t(isBD ? "map.hint.bd" : "map.hint.world");
+      const hint = t(kind === "bd-d" ? "map.hint.bdd" : isBD ? "map.hint.bd" : "map.hint.world");
+      tip.textContent = hint;
       redraw();
-      info.innerHTML = `<p style="color:var(--ink-soft)">👆 ${t(isBD ? "map.hint.bd" : "map.hint.world")}</p>`;
+      info.innerHTML = `<p style="color:var(--ink-soft)">👆 ${hint}</p>`;
     }
   });
   canvas.addEventListener("pointerdown", (e) => {
@@ -1843,6 +1864,7 @@ function screenAbout() {
     <h2 class="sec-title">ℹ️ ${t("about")}</h2>
     <div class="card">
       <h3>Geo Buddy</h3>
+      <p class="official-txt">geobuddy.nifraworld.com · v${GEO.version || ""}</p>
       <p style="font-size:14px;line-height:1.6;margin-top:8px">${t("dataSources")}</p>
       <p class="attr" style="margin-top:12px">${t("made")}</p>
     </div>`);

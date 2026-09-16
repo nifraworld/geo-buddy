@@ -1,6 +1,6 @@
 {
   "name": "geo-buddy",
-  "version": "1.0.0",
+  "version": "1.4.1",
   "private": true,
   "type": "module",
   "description": "Offline-first geography PWA for Bangladeshi children (EN+BN). Build pipeline for maps, flags and country data.",
@@ -12,6 +12,7 @@
     "data": "node scripts/build-data.mjs",
     "icons": "node scripts/icons.mjs",
     "build": "node scripts/build.mjs",
+    "build:sw": "node scripts/build.mjs --sw-only",
     "serve": "node scripts/serve.mjs",
     "smoke": "node scripts/smoke.mjs",
     "browsercheck": "node scripts/browser-check.mjs",

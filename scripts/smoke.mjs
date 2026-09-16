@@ -90,6 +90,19 @@ for (const q of a) {
     assert(q.choices.some((c) => c.id === q.answerId), "answer included in choices");
   }
 }
+// no raw i18n keys or type ids leaking into what the child reads
+// (would have caught the "qprompts.wf" / "bd-hq" prompts+choices of v1.0–1.4)
+const RAW_KEY = /^[a-z]+\.[a-z-]+$|^(bd-hq|bd-fact|bd-find|d-div|div-d|d-find|wf|wc|wh|hc|world-find)$/;
+const looksRaw = (s) => RAW_KEY.test(String(s || "").trim());
+for (const ty of ["bd-hq", "bd-fact", "bd-find", "d-div", "div-d", "d-find", "wf", "wc", "wh", "hc", "world-find"]) {
+  const qs = ty.startsWith("bd-") ? T.divQuestions(ty) : ty.startsWith("d") ? T.distQuestions(ty) : T.countryQuestions(ty);
+  const q = qs[0];
+  assert(!looksRaw(q.prompt), ty + " prompt is human text, got: " + q.prompt);
+  if (q.choices) {
+    assert(!q.choices.some((c) => looksRaw(c.label)), ty + " choice labels are human text, got: " + q.choices.map((c) => c.label).join(" | "));
+    assert(new Set(q.choices.map((c) => c.label)).size === q.choices.length, ty + " choice labels distinct");
+  }
+}
 // builder for world types
 for (const ty of ["wf", "wc", "wh", "hc", "world-find"]) {
   const qs = T.countryQuestions(ty);

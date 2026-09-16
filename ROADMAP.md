@@ -85,7 +85,8 @@ geo.nifraworld.com root
   - Follow-ups (parked): visual QA of the district map (label density, tint contrast), a
     `districts` count line on the Map tab, audited Bangla district names.
 - **V1.4** Pre-sale branding + licence/key system (mirrors Spelling Buddy). ✅
-  - `geobuddy.nifraworld.com` + app version pinned top-right on every screen.
+  - `geobuddy.nifraworld.com` + app version shown on welcome, PIN and About
+    (v1.4.1: removed from the child-facing top bar so it fits a 360px phone).
   - Server-side key formula (`functions/`, env `LICENCE_SECRET`) + private key generator
     (`admin-tools/`, git-ignored). Keys: `GB-XXXX-XXXX` (bundle) / `GB-BD-`·`GB-WR-`;
     teacher code `TP-XXXX-XXXX`.
@@ -95,6 +96,18 @@ geo.nifraworld.com root
   - App currently runs fully open (`APP_LOCKED = false`); flipping it starts enforcing keys.
   - Remaining (when selling starts): D1 + secrets in Cloudflare (dashboard steps in
     `functions/SETUP.md`), then flip `APP_LOCKED`.
+- **V1.4.1** Bug-fix pass from the first end-to-end review. ✅
+  - Quiz prompts rendered as raw keys (`qprompts.wf`) since v1: `t()` now resolves
+    dotted keys into nested tables; `bd-hq` choices are division names.
+  - Top bar overflowed at 390px (brand wrapped under the profile chip).
+  - Division map legend used a different palette from the map; one table now.
+  - Upstream GeoJSON tags Noakhali's Companiganj as Sylhet, dragging Hatiya &
+    Subarnachar with it — `UPAZILA_FIX` in `scripts/maps.mjs` corrects 7 upazilas.
+  - `hasScope()` now gates Play/Daily/Clock (no-op while `APP_LOCKED = false`).
+  - App version comes from `package.json` (was hard-coded 1.3.0); `npm run build:sw`
+    regenerates `sw.js` without re-fetching data.
+  - Smoke test asserts prompts/choices are human text, not keys or type ids.
+  - Key generator no longer ships the `LICENCE_SECRET` in the file (paste per tab).
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

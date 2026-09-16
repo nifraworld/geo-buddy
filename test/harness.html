@@ -94,9 +94,13 @@ if (failed) { document.title = "HARNESS-FAIL"; } else {
     // licence + branding
     {
       const htmlState = document.querySelector("#app").innerHTML;
-      ok(htmlState.indexOf("geobuddy.nifraworld.com") >= 0, "site tag rendered on parent");
-      ok(htmlState.indexOf("v" + X.GEO.version) >= 0, "version rendered on parent");
+      ok(htmlState.indexOf("geobuddy.nifraworld.com") < 0, "site tag kept out of the child-facing top bar");
       ok(/Licence|লাইসেন্স/.test(htmlState), "licence card on parent");
+      X.go("about");
+      const aboutState = document.querySelector("#app").innerHTML;
+      ok(aboutState.indexOf("geobuddy.nifraworld.com") >= 0, "site tag rendered on About");
+      ok(aboutState.indexOf("v" + X.GEO.version) >= 0, "version rendered on About");
+      X.go("parent");
       ok(X.deviceId().startsWith("gb-"), "device id format");
       ok(X.hasScope("bd") && X.hasScope("wr"), "hasScope true while unlocked");
       X.clearLicence();

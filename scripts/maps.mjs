@@ -21,6 +21,37 @@ function load(name) {
   return JSON.parse(readFileSync(CACHE + name, "utf8"));
 }
 
+/* Upstream tagging fixes. The source GeoJSON name-matches upazilas, so
+   Noakhali's Companiganj is tagged Sylhet (there is one of each), and the
+   untagged coastal upazilas next to it (Hatiya, Subarnachar, …) then get
+   attached to the nearest tagged neighbour — Sylhet — which draws a Sylhet
+   island in the Meghna estuary. Keyed by source_name; `near` is [lon, lat]
+   and must be within ~0.5° of the centroid for the fix to apply. */
+const UPAZILA_FIX = [
+  { name: "Companiganj", near: [91.29, 22.80], district: "Noakhali",   division: "Chattogram" },
+  { name: "Hatiya",      near: [91.07, 22.32], district: "Noakhali",   division: "Chattogram" },
+  { name: "Kabirhat",    near: [91.19, 22.83], district: "Noakhali",   division: "Chattogram" },
+  { name: "Subarnachar", near: [91.21, 22.57], district: "Noakhali",   division: "Chattogram" },
+  { name: "Senbagh",     near: [91.21, 22.98], district: "Noakhali",   division: "Chattogram" },
+  { name: "Kamalnagar",  near: [90.89, 22.75], district: "Lakshmipur", division: "Chattogram" },
+  { name: "Roypur",      near: [90.73, 22.99], district: "Lakshmipur", division: "Chattogram" },
+];
+function loadUpazilas() {
+  const fc = load("bd-upazilas.geojson");
+  let fixed = 0;
+  for (const f of fc.features) {
+    const p = f.properties || {};
+    const fix = UPAZILA_FIX.find((x) => x.name === String(p.source_name || p.name || "").trim());
+    if (!fix) continue;
+    const c = turf.centroid(f).geometry.coordinates;
+    if (Math.abs(c[0] - fix.near[0]) > 0.5 || Math.abs(c[1] - fix.near[1]) > 0.5) continue;
+    if (p.district_name === fix.district && p.division_name === fix.division) continue;
+    p.district_name = fix.district; p.division_name = fix.division; fixed++;
+  }
+  if (fixed) console.log("upazila tag fixes applied:", fixed);
+  return fc;
+}
+
 /* ---------- Bangladesh divisions ---------- */
 const RENAME = {                  // legacy spellings -> official 2026
   "Chittagong": "Chattogram", "Barisal": "Barishal",
@@ -48,7 +79,7 @@ function dissolveDivision(feats) {
 }
 
 function bdBuild() {
-  const fc = load("bd-upazilas.geojson");
+  const fc = loadUpazilas();
   const named = {}, unnamed = [];
   for (const f of fc.features) {
     const raw = String(f.properties.division_name || "").trim();
@@ -256,7 +287,7 @@ const DISTRICT_SLUG = {
   "Thakurgaon":"thakurgaon","Nawabganj":"nawabganj",
 };
 function bdDistrictBuild() {
-  const fc = load("bd-upazilas.geojson");
+  const fc = loadUpazilas();
   const named = {}, unnamed = [];
   for (const f of fc.features) {
     const raw = String(f.properties.district_name || "").trim();

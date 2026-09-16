@@ -10,19 +10,24 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const run = (cmd) => execSync(cmd, { cwd: ROOT, stdio: "inherit" });
 
-/* ---- Run sub-tasks in order ---- */
-console.log("\n=== fetch ===");
-run("node scripts/fetch.mjs");
-console.log("\n=== maps ===");
-run("node scripts/maps.mjs");
-console.log("\n=== flags ===");
-run("node scripts/flags.mjs");
-console.log("\n=== photos ===");
-run("node scripts/photos.mjs");
-console.log("\n=== icons ===");
-run("node scripts/icons.mjs");
-console.log("\n=== build-data ===");
-run("node scripts/build-data.mjs");
+/* ---- Run sub-tasks in order ----
+   `--sw-only` skips the data pipeline and just re-hashes + rewrites sw.js and
+   manifest.json — for engine/CSS-only changes that must bust the offline cache. */
+const swOnly = process.argv.includes("--sw-only");
+if (!swOnly) {
+  console.log("\n=== fetch ===");
+  run("node scripts/fetch.mjs");
+  console.log("\n=== maps ===");
+  run("node scripts/maps.mjs");
+  console.log("\n=== flags ===");
+  run("node scripts/flags.mjs");
+  console.log("\n=== photos ===");
+  run("node scripts/photos.mjs");
+  console.log("\n=== icons ===");
+  run("node scripts/icons.mjs");
+  console.log("\n=== build-data ===");
+  run("node scripts/build-data.mjs");
+}
 
 /* ---- Collect precache file list ---- */
 function walk(dir, base = "") {
