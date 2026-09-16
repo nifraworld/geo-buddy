@@ -16,6 +16,12 @@ Until the steps below are done the app is unaffected: it runs open
    Open it → **Console** → paste `functions/schema.sql` → **Execute**.
    *(Already created it from the v1.4 schema? Paste `functions/migrate-1.8.sql`
    instead — it adds the customer columns without dropping rows.)*
+   The SQL files are comment-free on purpose: the D1 console rejects a paste
+   that starts with comments ("Requests without any query are not supported").
+   What the columns mean: `devices` = one row per (email, device) with
+   first/last seen, grace window and owner override; `plans` = the customer
+   record — limit, plan name, packages, revoked, plus phone / paid / amount /
+   pay_via / scope / created.
 
 2. **Bind it to the site.**
    Workers & Pages → your Pages project → **Settings → Functions → D1 database
