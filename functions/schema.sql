@@ -1,7 +1,8 @@
--- D1 schema for Geo Buddy's licence backend.
+-- D1 schema for Geo Buddy's licence backend (fresh install).
 -- Safe to re-run in the D1 console. Telemetry tables (`devices`, `plans`)
 -- are dropped and rebuilt — they hold nothing that can't be rebuilt: every
 -- app re-registers its device and entitlement on the next online launch.
+-- (Existing DB from v1.4? Run migrate-1.8.sql instead to keep customer rows.)
 
 -- ============ one row per (licence email, device) ============
 DROP TABLE IF EXISTS devices;
@@ -17,7 +18,7 @@ CREATE TABLE devices (
   PRIMARY KEY (email, device)
 );
 
--- ============ the plan for each key ============
+-- ============ the plan + customer record for each key ============
 DROP TABLE IF EXISTS plans;
 CREATE TABLE plans (
   email        TEXT PRIMARY KEY,
@@ -27,5 +28,12 @@ CREATE TABLE plans (
   packages     TEXT NOT NULL DEFAULT '[]',   -- JSON array: ["bd","wr","bundle"]
   revoked      INTEGER NOT NULL DEFAULT 0,
   note         TEXT,
-  updated      TEXT
+  updated      TEXT,
+  -- v1.8 customer record (was localStorage in the private key generator)
+  phone        TEXT,                         -- WhatsApp number
+  paid         INTEGER NOT NULL DEFAULT 0,
+  amount       TEXT,                         -- what they paid, free text ("299")
+  pay_via      TEXT,                         -- bKash | Nagad | Rocket | Bank | Cash
+  scope        TEXT NOT NULL DEFAULT 'bundle', -- the key they were sold: bundle | bd | wr
+  created      TEXT
 );

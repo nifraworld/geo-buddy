@@ -1,0 +1,11 @@
+{
+  "_comment": "Selling switches. Edit and push — no rebuild needed; the app re-reads this on launch when online. locked=true makes Play/Daily/Clock/Learn-quiz require an activated key (Explore and Map stay free). Phone numbers: Bangladesh format 01XXXXXXXXX.",
+  "locked": false,
+  "selling": false,
+  "price": "৳ 299",
+  "priceNote": "one-time, up to 3 phones, all updates",
+  "bkash": "01XXXXXXXXX",
+  "nagad": "",
+  "whatsapp": "01XXXXXXXXX",
+  "email": "hello@nifraworld.com"
+}

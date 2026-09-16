@@ -77,6 +77,11 @@ const L = {
     updateReady: "New version ready — tap to update",
     homeDailyDone: "Come back tomorrow to keep your {n}-day streak",
     theme: "Appearance", themeSub: "Light, dark, or follow the phone", theme_auto: "Auto", theme_light: "Light", theme_dark: "Dark",
+    licenceSubLocked: "Quizzes need an activated key. Explore and the maps are always free.",
+    teacher: "Teacher", teacherCode: "Teacher code", teacherCodeSub: "Optional — given with school and coaching plans.", save: "Save", saved: "Saved",
+    buyTitle: "Get the full app", buyStep1: "Send the amount by bKash to {bkash} (Send Money)",
+    buyStep2: "Message us the bKash number you paid from and your email", buyStep3: "You get your key within a day — type it above",
+    buyMsg: "Hello! I would like to buy Geo Buddy ({price}).\nEmail: \nbKash number paid from: \nDevice: {dev}",
     sugWeak: "Practise your weak spot", sugNew: "Try something new", sugStart: "Start here",
     sugDivisions: "Bangladesh divisions", sugDistricts: "Bangladesh districts", sugWorld: "World flags, capitals & map",
     learned: "You got these right:", xpGained: "+{n} XP", levelUpTitle: "Level {n}!",
@@ -188,6 +193,11 @@ const L = {
     updateReady: "নতুন সংস্করণ প্রস্তুত — আপডেট করতে স্পর্শ করো",
     homeDailyDone: "{n} দিনের ধারা ধরে রাখতে কাল আবার এসো",
     theme: "চেহারা", themeSub: "হালকা, গাঢ়, বা ফোনের মতো", theme_auto: "স্বয়ং", theme_light: "হালকা", theme_dark: "গাঢ়",
+    licenceSubLocked: "কুইজের জন্য চালু করা কী দরকার। ঘুরে দেখা ও মানচিত্র সবসময় বিনামূল্যে।",
+    teacher: "শিক্ষক", teacherCode: "শিক্ষক কোড", teacherCodeSub: "ঐচ্ছিক — স্কুল ও কোচিং প্ল্যানের সাথে দেওয়া হয়।", save: "সংরক্ষণ", saved: "সংরক্ষিত",
+    buyTitle: "পূর্ণ অ্যাপ নিন", buyStep1: "বিকাশে {bkash} নম্বরে টাকা পাঠান (Send Money)",
+    buyStep2: "যে বিকাশ নম্বর থেকে পাঠালেন সেটি ও আপনার ইমেইল আমাদের মেসেজ করুন", buyStep3: "এক দিনের মধ্যে কী পাবেন — উপরে টাইপ করুন",
+    buyMsg: "হ্যালো! আমি Geo Buddy কিনতে চাই ({price})।\nইমেইল: \nযে বিকাশ নম্বর থেকে পাঠিয়েছি: \nডিভাইস: {dev}",
     sugWeak: "দুর্বল জায়গায় অনুশীলন করো", sugNew: "নতুন কিছু চেষ্টা করো", sugStart: "এখান থেকে শুরু",
     sugDivisions: "বাংলাদেশের বিভাগ", sugDistricts: "বাংলাদেশের জেলা", sugWorld: "বিশ্বের পতাকা, রাজধানী ও মানচিত্র",
     learned: "এগুলো ঠিক হয়েছে:", xpGained: "+{n} XP", levelUpTitle: "স্তর {n}!",
@@ -304,6 +314,7 @@ function load() {
   if (!D.settings) D.settings = {};
   if (D.settings.soundEnabled === undefined) D.settings.soundEnabled = true;
   if (!["auto", "light", "dark"].includes(D.settings.theme)) D.settings.theme = "auto";
+  APP_LOCKED = !!(D.settings.sale && D.settings.sale.locked);
   soundOn = D.settings.soundEnabled;
   applyTheme();
   const active = D.active && D.profiles[D.active] ? D.active : null;
@@ -347,7 +358,26 @@ function toggleFav(p, type, id) {
    Right now the whole app is open; when sales start, set APP_LOCKED = true
    and only activated keys unlock content. */
 const LICENCE_SCOPES = ["bd", "wr"];
+/* The lock and the "how to buy" details come from /sale.json (edited by the
+   owner, no rebuild). The last copy fetched is kept in settings so the rule
+   holds offline; before any fetch the app is open. */
+const SALE_DEFAULT = { locked: false, selling: false, price: "", priceNote: "", bkash: "", nagad: "", whatsapp: "", email: "" };
 let APP_LOCKED = false;
+function sale() { return (D && D.settings && D.settings.sale) || SALE_DEFAULT; }
+async function refreshSale() {
+  if (!navigator.onLine) return;
+  try {
+    const res = await fetch("/sale.json", { cache: "no-store" });
+    if (!res.ok) return;
+    const j = await res.json();
+    if (!j || typeof j !== "object") return;
+    D.settings.sale = { ...SALE_DEFAULT, ...j };
+    APP_LOCKED = !!D.settings.sale.locked;
+    save();
+    const cur = stack[stack.length - 1];
+    if (cur && ["home", "play", "parent"].includes(cur.name)) render(cur.name, cur.params || {});
+  } catch {}
+}
 
 function deviceId() {
   if (!D.settings.deviceId)
@@ -357,7 +387,7 @@ function deviceId() {
 }
 function licence() {
   if (!D.settings.licence)
-    D.settings.licence = { email: "", key: "", status: "free", plan: "Home", packages: [], deviceLimit: 0, deviceCount: 0, checkedAt: 0 };
+    D.settings.licence = { email: "", key: "", status: "free", plan: "Home", packages: [], deviceLimit: 0, deviceCount: 0, checkedAt: 0, tc: "", isTeacher: false };
   return D.settings.licence;
 }
 function licenceLabel() {
@@ -406,7 +436,7 @@ async function refreshLicence(silent) {
   if (!l.key) return;
   if (!navigator.onLine) { if (!silent) toast(t("licOffline")); return; }
   const url = "/api/licence?email=" + encodeURIComponent(l.email) + "&device=" + encodeURIComponent(deviceId()) +
-    "&ak=" + encodeURIComponent(l.key) + "&tc=";
+    "&ak=" + encodeURIComponent(l.key) + "&tc=" + encodeURIComponent(l.tc || "");
   try {
     const res = await fetch(url, { cache: "no-store", headers: { "cache-control": "no-cache" } });
     const r = res.ok ? await res.json() : null;
@@ -418,6 +448,7 @@ async function refreshLicence(silent) {
       const akPkg = r.akValid ? (r.packages || []).filter((x) => x === "bundle" || x === "bd" || x === "wr") : [];
       if (akPkg.length) l.packages = akPkg;
       if (r.revoked) l.status = "revoked";
+      l.isTeacher = !!r.isTeacher;
       l.checkedAt = Date.now();
       save();
     }
@@ -431,6 +462,11 @@ function scopeAllowed(scope) {
   toast("🔒 " + t("licNeeded"));
   go("pin");
   return false;
+}
+/* 🔒 marker for a section the current licence does not cover */
+function lockMark(scope) {
+  const need = scope === "both" ? ["bd", "wr"] : [scope === "world" ? "wr" : "bd"];
+  return need.every(hasScope) ? "" : `<span class="lock-mark" title="${t("licNeeded")}">🔒</span>`;
 }
 function clearLicence() {
   D.settings.licence = { email: "", key: "", status: "free", plan: "Home", packages: [], deviceLimit: 0, deviceCount: 0, checkedAt: Date.now() };
@@ -1084,11 +1120,11 @@ function screenPlay() {
   return html(`
     <div class="sec-title"><h2>${t("play")}</h2></div>
     <button class="mode-card" style="width:100%;margin:8px 0" data-nav="learn"><div class="em">📖</div><div class="tt">${t("learn")}</div><div class="ds">${t("learnSub")}</div></button>
-    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="daily"><div class="em">📅</div><div class="tt">${t("daily")}</div><div class="ds">${t("dailySub")}</div></button>
-    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="bd"><div class="em"><img class="em-flag" src="${flagUrl("bd")}" alt=""></div><div class="tt">${t("scopeBD")}</div><div class="ds">${t("qtypes")["bd-hq"]} · ${t("qtypes")["bd-fact"]} · ${t("qtypes")["bd-find"]}</div></button>
-    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="world"><div class="em">🌍</div><div class="tt">${t("scopeWorld")}</div><div class="ds">${t("qtypes")["wf"]} · ${t("qtypes")["wh"]} · ${t("qtypes")["world-find"]}</div></button>
-    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="both"><div class="em">🎲</div><div class="tt">${t("scopeBDWorld")}</div><div class="ds">${t("customSub")}</div></button>
-    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="clock"><div class="em">⏱️</div><div class="tt">${t("clock")}</div><div class="ds">${t("clockSub")}</div></button>`);
+    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="daily"><div class="em">📅</div><div class="tt">${t("daily")} ${lockMark("both")}</div><div class="ds">${t("dailySub")}</div></button>
+    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="bd"><div class="em"><img class="em-flag" src="${flagUrl("bd")}" alt=""></div><div class="tt">${t("scopeBD")} ${lockMark("bd")}</div><div class="ds">${t("qtypes")["bd-hq"]} · ${t("qtypes")["bd-fact"]} · ${t("qtypes")["bd-find"]}</div></button>
+    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="world"><div class="em">🌍</div><div class="tt">${t("scopeWorld")} ${lockMark("world")}</div><div class="ds">${t("qtypes")["wf"]} · ${t("qtypes")["wh"]} · ${t("qtypes")["world-find"]}</div></button>
+    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="both"><div class="em">🎲</div><div class="tt">${t("scopeBDWorld")} ${lockMark("both")}</div><div class="ds">${t("customSub")}</div></button>
+    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="clock"><div class="em">⏱️</div><div class="tt">${t("clock")} ${lockMark("both")}</div><div class="ds">${t("clockSub")}</div></button>`);
 }
 MOUNT.play = (p) => {};
 
@@ -2368,23 +2404,52 @@ MOUNT.pin = (params = {}) => {
   }
   paintDots();
 };
+function buyCard() {
+  const sl = sale();
+  if (!sl.selling && !APP_LOCKED) return "";
+  const dev = deviceId();
+  const msg = tvar("buyMsg", { price: sl.price || "", dev });
+  const wa = String(sl.whatsapp || "").replace(/[^0-9]/g, "");
+  const waNum = wa.length === 11 && wa[0] === "0" ? "88" + wa : wa;
+  return `
+    <div class="card buy">
+      <h3>🛒 ${t("buyTitle")}</h3>
+      <div class="price"><b>${sl.price || ""}</b><small>${sl.priceNote || ""}</small></div>
+      <ol class="buy-steps">
+        <li>${tvar("buyStep1", { bkash: sl.bkash || "—" })}${sl.nagad ? ` · Nagad ${sl.nagad}` : ""}</li>
+        <li>${t("buyStep2")}</li>
+        <li>${t("buyStep3")}</li>
+      </ol>
+      <div class="btn-row">
+        ${waNum ? `<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/${waNum}?text=${encodeURIComponent(msg)}">💬 WhatsApp</a>` : ""}
+        ${sl.email ? `<a class="btn btn-paper" href="mailto:${sl.email}?subject=${encodeURIComponent("Geo Buddy")}&body=${encodeURIComponent(msg)}">✉️ Email</a>` : ""}
+      </div>
+    </div>`;
+}
 function licCard() {
   const l = licence();
   const has = !!l.key;
+  const scopes = has ? LICENCE_SCOPES.map((sc) => `<span class="tag ${hasScope(sc) ? "on" : ""}">${hasScope(sc) ? "✅" : "🔒"} ${t(sc === "bd" ? "scopeBD" : "scopeWorld")}</span>`).join("") : "";
   return `
     <div class="card">
       <h3>🔑 ${t("licence")}</h3>
-      <p class="ds" style="margin-top:6px">${t("licenceSub")}</p>
+      <p class="ds" style="margin-top:6px">${APP_LOCKED ? t("licenceSubLocked") : t("licenceSub")}</p>
       <div class="setting" style="border:none;margin-top:8px">
         <span><span class="tt">${licenceLabel()}</span>
-        ${has ? `<br><span class="ds">${l.email}${l.deviceLimit ? ` · ${tvar("licDevices", { n: l.deviceCount || 0, limit: l.deviceLimit })}` : ""}</span>` : ""}</span>
-        ${has ? `<button class="btn btn-mini" style="background:var(--cream);color:var(--bad)" data-action="p-lic-remove">${t("licRemove")}</button>` : ""}
+        ${has ? `<br><span class="ds">${l.email}${l.plan ? ` · ${l.plan}` : ""}${l.deviceLimit ? ` · ${tvar("licDevices", { n: l.deviceCount || 0, limit: l.deviceLimit })}` : ""}${l.isTeacher ? ` · 🎓 ${t("teacher")}` : ""}</span>
+        <span class="chips" style="margin-top:6px">${scopes}</span>` : ""}</span>
+        ${has ? `<button class="btn btn-mini" style="background:var(--inset);color:var(--bad)" data-action="p-lic-remove">${t("licRemove")}</button>` : ""}
       </div>
-      ${has ? "" : `
+      ${has ? `
+      <details class="tc"><summary>🎓 ${t("teacherCode")}</summary>
+        <div class="row-inl"><input id="lic-tc" class="lic-inp" spellcheck="false" autocomplete="off" placeholder="TP-XXXX-XXXX" value="${l.tc || ""}"><button class="btn btn-mini btn-paper" data-action="p-lic-tc">${t("save")}</button></div>
+        <p class="ds">${t("teacherCodeSub")}</p>
+      </details>` : `
       <input id="lic-email" class="lic-inp" inputmode="email" autocomplete="email" placeholder="${t("licEmail")}">
       <input id="lic-key" class="lic-inp" spellcheck="false" autocomplete="off" placeholder="${t("licKey")} — GB-XXXX-XXXX" style="margin-top:8px">
       <button class="btn btn-sun btn-small" style="margin-top:10px;padding:12px" data-action="p-lic-activate">🔑 ${t("licActivate")}</button>`}
-    </div>`;
+    </div>
+    ${has && hasScope("bd") && hasScope("wr") ? "" : buyCard()}`;
 }
 function screenParent() {
   const p = profile();
@@ -2477,6 +2542,14 @@ MOUNT.parent = (params) => {
       const err = r && r.error;
       toast(err === "network" ? t("licErrNetwork") : (err === "no match" ? t("licErrMatch") : t("licErrFields")));
     }
+  });
+  bindAction(APP, "p-lic-tc", async () => {
+    const l = licence();
+    l.tc = ((APP.querySelector("#lic-tc") || {}).value || "").trim().toUpperCase();
+    save();
+    await refreshLicence(false);
+    render("parent");
+    toast(l.isTeacher ? "🎓 " + t("teacher") : t("saved"));
   });
   bindAction(APP, "p-lic-remove", () => {
     clearLicence();
@@ -2626,8 +2699,9 @@ function boot() {
   if (licence().key) refreshLicence(true);
   go("welcome");
   setupServiceWorker();
+  refreshSale();
 }
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED };
+export const __test = { sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };

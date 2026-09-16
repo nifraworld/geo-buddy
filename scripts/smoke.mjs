@@ -143,6 +143,17 @@ for (const ty of ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d
   const rg = T.deckFor("region", GEO.regions[0].id);
   assert(rg.items.length > 10 && rg.items[0].flag, "region deck has flags");
 }
+// v1.8: lock switch from sale.json
+{
+  assert(T.hasScope("bd") && T.lockMark("bd") === "", "open app: no lock marks");
+  T.setLocked(true);
+  assert(!T.hasScope("bd") && !T.hasScope("wr"), "locked without a key: scopes denied");
+  assert(T.lockMark("world").indexOf("🔒") >= 0, "locked: lock mark rendered");
+  const qs = T.buildQuestionList({ scope: "bd", types: ["bd-hq"], count: 3, adaptive: false });
+  assert(qs.length === 3, "question building itself is not gated (gate is at session start)");
+  T.setLocked(false);
+  assert(T.hasScope("wr"), "unlocked again");
+}
 // builder for world types
 for (const ty of ["wf", "wc", "wh", "hc", "world-find"]) {
   const qs = T.countryQuestions(ty);

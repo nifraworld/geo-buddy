@@ -1,6 +1,6 @@
 # Geo Buddy — Bangladesh & World Geography for Kids
 
-Repository: `D:\GeoBuddy`  ·  Project: Geo Buddy  ·  Status: v1.4 (licence + branding) build
+Repository: `D:\GeoBuddy`  ·  Project: Geo Buddy  ·  Status: v1.8 (selling & admin) build
 
 An **offline-first PWA** (HTML/JS/CSS + service worker) that borrows the **structure
 and screens of Spelling Buddy** (`spelling.nifraworld.com`) and the **feature ideas of
@@ -165,6 +165,25 @@ geo.nifraworld.com root
     slack from 5 letters (Latin), Bangla exact, "the"/"republic of" tolerated, both
     languages accepted.
   - Session never asks the same entity twice in a row.
+- **V1.8** Selling & admin. ✅ (code side — Cloudflare steps in `functions/SETUP.md`)
+  - **`/admin`** served by a Pages Function, password = `REVIEW_KEY` (tab-scoped):
+    customers with plan/scope/paid/amount/via/phone/note inline-editable, device list
+    with full/grace/free + overrides, over-limit flag, revoke/restore, delete, search
+    and filters, CSV/JSON export, **Make a key** (server-side, secret never leaves
+    Cloudflare) with copy / WhatsApp deep link, **Check a key**.
+  - `/api/keys`: lists plans ∪ devices (was devices-only), actions `make` / `check` /
+    `customer` / `delete`; `schema.sql` gains customer columns; `migrate-1.8.sql` for
+    the existing DB.
+  - **`sale.json`** (repo root, no rebuild): `locked`, `selling`, price, bKash/Nagad,
+    WhatsApp, email. App fetches it fresh on launch, keeps the last copy for offline.
+  - App: 🔒 marks on locked Play sections; Licence card shows plan, device count,
+    per-scope ✅/🔒, teacher code entry (sent as `tc`, 🎓 shown when valid); **Get the
+    full app** card with price, bKash steps, WhatsApp/email buttons (prefilled message
+    with device id) when `selling` or locked without full cover.
+  - `_headers`: `/admin` no-store + noindex; `/sale.json` no-cache; SW passes both through.
+  - Not done (needs you): D1 + secrets in the dashboard, a fresh `LICENCE_SECRET`,
+    flipping `sale.json`. bKash *API* integration deliberately skipped — manual
+    confirmation via the admin page fits the volume.
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

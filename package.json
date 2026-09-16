@@ -1,6 +1,6 @@
 {
   "name": "geo-buddy",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "type": "module",
   "description": "Offline-first geography PWA for Bangladeshi children (EN+BN). Build pipeline for maps, flags and country data.",
