@@ -92,16 +92,56 @@ for (const q of a) {
 }
 // no raw i18n keys or type ids leaking into what the child reads
 // (would have caught the "qprompts.wf" / "bd-hq" prompts+choices of v1.0–1.4)
-const RAW_KEY = /^[a-z]+\.[a-z-]+$|^(bd-hq|bd-fact|bd-find|d-div|div-d|d-find|wf|wc|wh|hc|world-find)$/;
+const RAW_KEY = /^[a-z]+\.[a-z-]+$|^(bd-hq|bd-fact|bd-find|bd-type|d-div|div-d|d-find|wf|wc|wh|hc|world-find|wn|wb|wt)$/;
 const looksRaw = (s) => RAW_KEY.test(String(s || "").trim());
-for (const ty of ["bd-hq", "bd-fact", "bd-find", "d-div", "div-d", "d-find", "wf", "wc", "wh", "hc", "world-find"]) {
+for (const ty of ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d-find", "wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt"]) {
   const qs = ty.startsWith("bd-") ? T.divQuestions(ty) : ty.startsWith("d") ? T.distQuestions(ty) : T.countryQuestions(ty);
   const q = qs[0];
+  assert(q, ty + " builds at least one question");
+  if (!q) continue;
   assert(!looksRaw(q.prompt), ty + " prompt is human text, got: " + q.prompt);
   if (q.choices) {
     assert(!q.choices.some((c) => looksRaw(c.label)), ty + " choice labels are human text, got: " + q.choices.map((c) => c.label).join(" | "));
     assert(new Set(q.choices.map((c) => c.label)).size === q.choices.length, ty + " choice labels distinct");
   }
+}
+// v1.7: typed answers, SRS, new types, decks
+{
+  assert(T.typedMatches("bangladesh", ["Bangladesh", "বাংলাদেশ"]), "typed exact (case)");
+  assert(T.typedMatches("Bangladsh", ["Bangladesh"]), "typed one-letter slip accepted at 5+ letters");
+  assert(!T.typedMatches("Bangla", ["Bangladesh"]), "typed truncation rejected");
+  assert(T.typedMatches("বাংলাদেশ ", ["Bangladesh", "বাংলাদেশ"]), "typed Bangla exact after trim");
+  assert(!T.typedMatches("Ind", ["Iran"]), "short typos rejected");
+  assert(T.typedMatches("the gambia", ["Gambia"]), "leading 'the' tolerated");
+  assert(T.typedMatches("Côte d'Ivoire", ["Côte d’Ivoire"]), "apostrophe variants");
+  const wn = T.countryQuestions("wn"); const wb = T.countryQuestions("wb"); const wt = T.countryQuestions("wt"); const bt = T.divQuestions("bd-type");
+  assert(wn.length > 100 && wn.every((q) => q.choices.length === 4 && q.choices.some((c) => c.id === q.answerId) && q.itemId), "wn builds with 4 choices + itemId");
+  assert(wn.every((q) => { const c = GEO.countries.find((x) => x.id === q.itemId); const a = GEO.countries.find((x) => x.id === q.answerId); return c.neighbors.includes(a.en); }), "wn answer is a real neighbour");
+  assert(wb.length > 150 && wb.every((q) => q.choices.length === 2), "wb builds with 2 choices");
+  assert(wb.every((q) => { const [a, b] = q.choices.map((c) => GEO.countries.find((x) => x.id === c.id)); const big = a.area >= b.area ? a : b; return big.id === q.answerId; }), "wb answer is the larger area");
+  assert(wt.length === 194 && wt.every((q) => q.kind === "type" && q.accept.length >= 2 && q.answerLabel), "wt typed questions");
+  assert(bt.length === 8 && bt.every((q) => q.kind === "type"), "bd-type typed questions");
+  // SRS: a correct answer schedules the item into the future; a miss makes it due now
+  const p = T.profile() || T.newProfile("smoke");
+  T.bumpItem(p, "c", "TEST1", true);
+  const st = p.itemStats["c|TEST1"];
+  assert(st.reps === 1 && st.ivl === 1 && st.due > Math.floor(Date.now() / 86400000), "srs: first correct -> due tomorrow");
+  T.bumpItem(p, "c", "TEST1", true);
+  assert(st.reps === 2 && st.ivl === 3, "srs: second correct -> 3 days");
+  T.bumpItem(p, "c", "TEST1", false);
+  assert(st.reps === 0 && st.due === Math.floor(Date.now() / 86400000), "srs: miss -> due today");
+  assert(T.dueCount(p) >= 1, "dueCount counts due items");
+  const wDue = T.srsWeight(p, { type: "wf", answerId: "TEST1" });
+  const wNew = T.srsWeight(p, { type: "wf", answerId: "NEVER" });
+  assert(wDue > wNew && wNew === 3, "srs: due item outweighs never-seen (" + wDue + " > " + wNew + ")");
+  delete p.itemStats["c|TEST1"];
+  // decks
+  const dk = T.deckFor("dist", "rangpur");
+  assert(dk.items.length === 8 && dk.items.every((i) => i.name && i.back.length), "district deck for Rangpur has 8 cards");
+  const dq = T.buildQuestionList({ scope: "bd", types: ["d-div", "div-d"], count: 10, adaptive: true, items: new Set(dk.items.map((i) => i.id)) });
+  assert(dq.length === 10 && dq.every((q) => dk.items.some((i) => i.id === (q.itemId || q.answerId))), "deck quiz restricted to the deck's items");
+  const rg = T.deckFor("region", GEO.regions[0].id);
+  assert(rg.items.length > 10 && rg.items[0].flag, "region deck has flags");
 }
 // builder for world types
 for (const ty of ["wf", "wc", "wh", "hc", "world-find"]) {

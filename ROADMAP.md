@@ -150,6 +150,21 @@ geo.nifraworld.com root
     follows the phone by default, Parent Zone → Appearance overrides (Auto/Light/Dark).
     Canvas maps get dark water/land/label inks. `theme-color` meta follows.
   - Map labels avoid the zoom buttons and hint pill at every zoom.
+- **V1.7** Learning depth. ✅
+  - **Learn mode** (Play → Learn): flip-card decks — Bangladesh divisions, districts of
+    each division, countries of each region. Front: flag / colour swatch + name + TTS;
+    back: capital/HQ, population, area, neighbours or fun fact. Swipe or ◀ ▶; "Quiz me
+    on these" builds an adaptive session restricted to the deck's items.
+  - **Spaced repetition** (SM-2-lite per item: reps / interval / ease / due day) replaces
+    the old adaptive weighting — which never worked: it looked stats up by question
+    type ("wf|004") while they were stored by entity ("c|004"). Due and never-seen items
+    lead; Home and Learn show "N to review today" with a one-tap review session.
+  - **New question types**: Neighbours (`wn`), Which is bigger? (`wb`, areas ≥1.6× apart,
+    shows both areas after), Type the country from its flag (`wt`), Type the division
+    from its HQ (`bd-type`). Typed answers: case/punctuation-insensitive, one-letter
+    slack from 5 letters (Latin), Bangla exact, "the"/"republic of" tolerated, both
+    languages accepted.
+  - Session never asks the same entity twice in a row.
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

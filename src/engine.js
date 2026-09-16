@@ -97,7 +97,8 @@ const L = {
       "bd-hq": "Division from HQ", "bd-fact": "Division from fact", "bd-find": "Find division on map",
       "d-div": "Division → District", "div-d": "District → Division", "d-find": "Find district on map",
       "wf": "Flag → Country", "wc": "Country → Flag", "wh": "Country → Capital", "hc": "Capital → Country",
-      "world-find": "Find country on map",
+      "world-find": "Find country on map", "wn": "Neighbours", "wb": "Which is bigger?", "wt": "Type the country",
+      "bd-type": "Type the division",
     },
     qprompts: {
       "bd-hq": "Which division has the headquarters in {X}?",
@@ -108,7 +109,16 @@ const L = {
       "wc": "Which flag belongs to {X}?",
       "wh": "What is the capital of {X}?",
       "hc": "Which country has the capital {X}?",
+      "wn": "Which country shares a border with {X}?",
+      "wb": "Which country is bigger?",
+      "wt": "Type the name of this country",
+      "bd-type": "Type the division whose headquarters is {X}",
     },
+    typeHere: "Type your answer…", check: "Check", showMe: "Show me",
+    learn: "Learn", learnSub: "Flip cards first, then quiz yourself", learnPick: "What do you want to learn?",
+    deckDivisions: "Bangladesh divisions", deckDistrictsOf: "Districts of {X}", deckRegion: "Countries of {X}",
+    cardOf: "Card {n} of {total}", tapToFlip: "Tap to flip", quizMe: "Quiz me on these", deckDone: "Deck finished!",
+    dueToday: "{n} to review today",
     setupScope: "Where to play?", setupTypes: "Question types", setupCount: "How many?",
     scopeBD: "Bangladesh", scopeWorld: "World", scopeBDWorld: "Bangladesh + World",
     typeCount: "{n} questions", adaptive: "Focus on my mistakes",
@@ -198,7 +208,8 @@ const L = {
       "bd-hq": "সদর দপ্তর থেকে বিভাগ", "bd-fact": "তথ্য থেকে বিভাগ", "bd-find": "মানচিত্রে বিভাগ খুঁজো",
       "d-div": "বিভাগ → জেলা", "div-d": "জেলা → বিভাগ", "d-find": "মানচিত্রে জেলা খুঁজো",
       "wf": "পতাকা → দেশ", "wc": "দেশ → পতাকা", "wh": "দেশ → রাজধানী", "hc": "রাজধানী → দেশ",
-      "world-find": "মানচিত্রে দেশ খুঁজো",
+      "world-find": "মানচিত্রে দেশ খুঁজো", "wn": "প্রতিবেশী", "wb": "কোনটি বড়?", "wt": "দেশের নাম লেখো",
+      "bd-type": "বিভাগের নাম লেখো",
     },
     qprompts: {
       "bd-hq": "কোন বিভাগের সদর দপ্তর {X}?",
@@ -209,7 +220,16 @@ const L = {
       "wc": "{X} কোন পতাকা?",
       "wh": "{X}-এর রাজধানী কী?",
       "hc": "রাজধানী {X} কোন দেশের?",
+      "wn": "{X}-এর সাথে কোন দেশের সীমান্ত আছে?",
+      "wb": "কোন দেশটি বড়?",
+      "wt": "এই দেশের নাম লেখো",
+      "bd-type": "যে বিভাগের সদর দপ্তর {X}, তার নাম লেখো",
     },
+    typeHere: "উত্তর লেখো…", check: "যাচাই", showMe: "দেখাও",
+    learn: "শেখা", learnSub: "আগে কার্ড উল্টে দেখো, তারপর কুইজ", learnPick: "কী শিখতে চাও?",
+    deckDivisions: "বাংলাদেশের বিভাগ", deckDistrictsOf: "{X}-এর জেলাগুলো", deckRegion: "{X}-এর দেশগুলো",
+    cardOf: "কার্ড {n}/{total}", tapToFlip: "উল্টাতে স্পর্শ করো", quizMe: "এগুলো নিয়ে কুইজ", deckDone: "ডেক শেষ!",
+    dueToday: "আজ {n}টি পুনরায় দেখার আছে",
     setupScope: "কোথায় খেলবে?", setupTypes: "কোন ধরনের প্রশ্ন?", setupCount: "কতগুলো প্রশ্ন?",
     scopeBD: "বাংলাদেশ", scopeWorld: "বিশ্ব", scopeBDWorld: "বাংলাদেশ + বিশ্ব",
     typeCount: "{n} প্রশ্ন", adaptive: "ভুলগুলোতেই বেশি অনুশীলন",
@@ -416,10 +436,41 @@ function clearLicence() {
   D.settings.licence = { email: "", key: "", status: "free", plan: "Home", packages: [], deviceLimit: 0, deviceCount: 0, checkedAt: Date.now() };
   save();
 }
+/* Per-item stats + SM-2-lite spaced repetition.
+   { a, ok }        attempts / correct (kept for accuracy stats)
+   { reps, ivl, ef, due }  streak of correct answers, interval (days), ease,
+                            day-number when the item is due again */
+const DAY = 86400000;
+const dayNum = () => Math.floor(Date.now() / DAY);
 function bumpItem(p, type, id, correct) {
   const k = itemKey(type, id);
   const s = (p.itemStats[k] = p.itemStats[k] || { a: 0, ok: 0 });
   s.a++; if (correct) s.ok++;
+  if (s.ef === undefined) { s.reps = 0; s.ivl = 0; s.ef = 2.3; }
+  if (correct) {
+    s.reps++;
+    s.ivl = s.reps === 1 ? 1 : s.reps === 2 ? 3 : Math.round(s.ivl * s.ef);
+    s.ef = Math.min(2.7, s.ef + 0.08);
+  } else {
+    s.reps = 0; s.ivl = 0;
+    s.ef = Math.max(1.3, s.ef - 0.2);
+  }
+  s.due = dayNum() + s.ivl;
+}
+/* how much a question wants to be asked now: due/overdue items first, then
+   never-seen ones, then a trickle of everything else; recent misses weigh more */
+function srsWeight(p, q) {
+  const st = p.itemStats[itemKey(entTypeOf(q), q.itemId || q.answerId)];
+  if (!st) return 3;
+  const today = dayNum();
+  const overdue = st.due === undefined ? 0 : today - st.due;
+  let w = overdue >= 0 ? 5 + Math.min(5, overdue) : 0.35;
+  w += Math.min(6, Math.pow(st.a - st.ok, 1.5));
+  return w;
+}
+function dueCount(p) {
+  const today = dayNum();
+  return Object.values(p.itemStats || {}).filter((st) => st.due !== undefined && st.due <= today).length;
 }
 function addStars(p, type, id, correct) {
   const k = itemKey(type, id);
@@ -673,7 +724,7 @@ function render(name, params) {
     explore: screenExplore, detail: screenDetail, map: screenMap,
     play: screenPlay, session: screenSession, results: screenResults,
     daily: screenDaily, parent: screenParent, pin: screenPin, about: screenAbout,
-    custom: screenCustom, clock: screenClock,
+    custom: screenCustom, clock: screenClock, learn: screenLearn, cards: screenCards,
   }[name];
   // leaving the quiz screen abandons the session: its answer/next timers must
   // not append the next question onto whatever screen is shown now
@@ -759,6 +810,7 @@ function screenHome() {
     </button>
 
     <div class="goal-row">
+      ${dueCount(act) ? `<button class="goal act" data-nav="learn"><span class="g-ico">🔁</span><span class="g-txt"><b>${tvar("dueToday", { n: dueCount(act) })}</b><small>${t("learnSub")}</small></span><span class="nc-go">▶</span></button>` : ""}
       ${nb ? `<div class="goal">
         <span class="g-ico">${nb.b.icon}</span>
         <span class="g-txt"><b>${_lang === "bn" ? nb.b.bn : nb.b.en}</b><small>${_lang === "bn" ? nb.b.descBn : nb.b.descEn}</small>
@@ -1031,6 +1083,7 @@ const SUBREGION_BN = {
 function screenPlay() {
   return html(`
     <div class="sec-title"><h2>${t("play")}</h2></div>
+    <button class="mode-card" style="width:100%;margin:8px 0" data-nav="learn"><div class="em">📖</div><div class="tt">${t("learn")}</div><div class="ds">${t("learnSub")}</div></button>
     <button class="mode-card" style="width:100%;margin:8px 0" data-nav="daily"><div class="em">📅</div><div class="tt">${t("daily")}</div><div class="ds">${t("dailySub")}</div></button>
     <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="bd"><div class="em"><img class="em-flag" src="${flagUrl("bd")}" alt=""></div><div class="tt">${t("scopeBD")}</div><div class="ds">${t("qtypes")["bd-hq"]} · ${t("qtypes")["bd-fact"]} · ${t("qtypes")["bd-find"]}</div></button>
     <button class="mode-card" style="width:100%;margin:8px 0" data-nav="custom" data-scope="world"><div class="em">🌍</div><div class="tt">${t("scopeWorld")}</div><div class="ds">${t("qtypes")["wf"]} · ${t("qtypes")["wh"]} · ${t("qtypes")["world-find"]}</div></button>
@@ -1041,9 +1094,9 @@ MOUNT.play = (p) => {};
 
 /* ---------- custom quiz setup ---------- */
 let SETUP = { scope: "bd", types: [], count: 10, adaptive: false };
-const ALL_TYPES = ["bd-hq", "bd-fact", "bd-find", "d-div", "div-d", "d-find", "wf", "wc", "wh", "hc", "world-find"];
-const BD_TYPES = ["bd-hq", "bd-fact", "bd-find", "d-div", "div-d", "d-find"];
-const WORLD_TYPES = ["wf", "wc", "wh", "hc", "world-find"];
+const ALL_TYPES = ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d-find", "wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt"];
+const BD_TYPES = ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d-find"];
+const WORLD_TYPES = ["wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt"];
 function screenCustom() {
   const scope = SETUP.scope;
   const shown = scope === "bd" ? BD_TYPES
@@ -1093,6 +1146,121 @@ MOUNT.custom = (p) => {
   });
 };
 
+/* ---------- learn mode: flip-card decks ---------- */
+function deckFor(kind, key) {
+  // returns { title, scope, types, items:[{id, ent, name, speak, sub, back, fact, flag?, color?}] }
+  if (kind === "div") {
+    return { title: t("deckDivisions"), scope: "bd", types: ["bd-hq", "bd-fact", "bd-find", "bd-type"],
+      items: DIVS.map((d) => ({ id: d.id, ent: "d", name: name(d), speak: _lang === "bn" ? d.bn : d.en, color: DIV_PALETTE[d.id],
+        sub: `${t("hq")}: ${_lang === "bn" ? d.hqBn : d.hq}`,
+        back: [[t("hq"), _lang === "bn" ? d.hqBn : d.hq], [t("districts"), fmtNum(d.districts)], [t("pop"), fmtNum(d.pop)], [t("area"), fmtNum(d.areaKm2) + " km²"]],
+        fact: _lang === "bn" ? d.factBn : d.factEn })) };
+  }
+  if (kind === "dist") {
+    const div = divIdx[key];
+    const ds = DISTS.filter((d) => d.div === key);
+    return { title: tvar("deckDistrictsOf", { X: name(div) }), scope: "bd", types: ["d-div", "div-d", "d-find"],
+      items: ds.map((d) => ({ id: d.id, ent: "z", name: dname(d), speak: _lang === "bn" ? d.bn : d.en, color: DIV_PALETTE[d.div],
+        sub: `${t("district")} · ${name(div)}`,
+        back: [[t("division"), name(div)], [t("pop"), fmtNum(d.pop)], [t("area"), fmtNum(d.areaKm2) + " km²"], [t("upazilas"), fmtNum(d.upazilas)]] })) };
+  }
+  const reg = REGIONS.find((r) => r.id === key) || REGIONS[0];
+  const cs = CTRY.filter((c) => c.region === reg.en);
+  return { title: tvar("deckRegion", { X: _lang === "bn" ? reg.bn : reg.en }), scope: "world", types: ["wf", "wh", "hc", "world-find", "wt"],
+    items: cs.map((c) => ({ id: c.id, ent: "c", name: cname(c), speak: _lang === "bn" ? c.bn : c.en, flag: c.flagCode,
+      sub: `${t("capital")}: ${cap(c)}`,
+      back: [[t("capital"), cap(c)], [t("region"), regionBn(c.region)], [t("pop"), c.population ? fmtPop(c.population) : "—"], [t("area"), fmtNum(c.area) + " km²"]],
+      fact: (c.neighbors && c.neighbors.length) ? `${t("neighbors")}: ${c.neighbors.slice(0, 5).map((n) => { const nc = CTRY.find((x) => x.en === n); return nc ? cname(nc) : n; }).join(", ")}` : "" })) };
+}
+function screenLearn() {
+  const p = profile();
+  const due = p ? dueCount(p) : 0;
+  return html(`
+    <h2 class="sec-title">📖 ${t("learn")}</h2>
+    ${due ? `<button class="next-card" data-action="learn-due"><span class="nc-ico">🔁</span><span class="nc-txt"><b>${tvar("dueToday", { n: due })}</b><small>${t("adaptive")}</small></span><span class="nc-go">▶</span></button>` : ""}
+    <div class="card">
+      <h3>${t("learnPick")}</h3>
+      <div class="deck-list">
+        <button class="item deck" data-action="learn-deck" data-kind="div"><span class="ring" style="background:var(--brand)">🗺️</span><span class="tx"><span class="nm">${t("deckDivisions")}</span><span class="sb">8 · ${t("levelDivisions")}</span></span><span class="st">▶</span></button>
+        ${DIVS.map((d) => `<button class="item deck" data-action="learn-deck" data-kind="dist" data-key="${d.id}"><span class="ring" style="background:${DIV_PALETTE[d.id]}">🧩</span><span class="tx"><span class="nm">${tvar("deckDistrictsOf", { X: name(d) })}</span><span class="sb">${d.districts} · ${t("levelDistricts")}</span></span><span class="st">▶</span></button>`).join("")}
+        ${REGIONS.map((r) => `<button class="item deck" data-action="learn-deck" data-kind="region" data-key="${r.id}"><span class="ring" style="background:var(--info)">🌍</span><span class="tx"><span class="nm">${tvar("deckRegion", { X: _lang === "bn" ? r.bn : r.en })}</span><span class="sb">${CTRY.filter((c) => c.region === r.en).length} · ${t("sectionWorld")}</span></span><span class="st">▶</span></button>`).join("")}
+      </div>
+    </div>`);
+}
+MOUNT.learn = () => {
+  bindAction(APP, "learn-deck", (e, btn) => go("cards", { kind: btn.getAttribute("data-kind"), key: btn.getAttribute("data-key") || "", i: 0 }));
+  bindAction(APP, "learn-due", () => {
+    if (!scopeAllowed("both")) return;
+    const qs = buildQuestionList({ scope: "both", types: ALL_TYPES.filter((x) => x !== "wt" && x !== "bd-type"), count: 10, adaptive: true });
+    if (qs.length) startSession({ title: t("adaptive"), questions: qs, clock: false, daily: false });
+  });
+};
+function screenCards(params = {}) {
+  const deck = deckFor(params.kind, params.key);
+  const i = Math.max(0, Math.min(deck.items.length - 1, params.i || 0));
+  const it = deck.items[i];
+  const p = profile();
+  const stN = p ? starShown(p, it.ent, it.id) : 0;
+  const pct = Math.round(((i + 1) / deck.items.length) * 100);
+  return html(`
+    <h2 class="sec-title"><span>${deck.title}</span><small class="ver">${tvar("cardOf", { n: i + 1, total: deck.items.length })}</small></h2>
+    <div class="q-progress"><i style="width:${pct}%"></i></div>
+    <div class="flip" data-flip="1">
+      <div class="flip-inner">
+        <div class="face front" style="--accent:${it.color || "var(--brand)"}">
+          ${it.flag ? `<img class="card-flag" src="${flagUrl(it.flag)}" alt="">` : `<div class="card-swatch" style="background:${it.color}"></div>`}
+          <div class="card-name">${it.name}</div>
+          <div class="card-sub">${it.sub}</div>
+          <div class="stars">${"★".repeat(stN)}${"☆".repeat(3 - stN)}</div>
+          <div class="flip-hint">↻ ${t("tapToFlip")}</div>
+        </div>
+        <div class="face back" style="--accent:${it.color || "var(--brand)"}">
+          <div class="card-name sm">${it.name}</div>
+          <div class="stat-grid">${it.back.map(([k, v]) => `<div class="stat"><b>${v}</b><small>${k}</small></div>`).join("")}</div>
+          ${it.fact ? `<div class="factbox">${it.fact}</div>` : ""}
+        </div>
+      </div>
+    </div>
+    <div class="btn-row card-nav">
+      <button class="btn btn-paper" data-action="card-prev" ${i === 0 ? "disabled" : ""}>◀</button>
+      <button class="btn btn-paper" data-action="card-say">🔊</button>
+      ${i < deck.items.length - 1
+        ? `<button class="btn btn-primary" data-action="card-next">▶</button>`
+        : `<button class="btn btn-sun" data-action="card-quiz">🎯 ${t("quizMe")}</button>`}
+    </div>
+    ${i === deck.items.length - 1 ? "" : `<button class="btn btn-paper btn-small" data-action="card-quiz" style="margin:10px auto 0;display:flex">🎯 ${t("quizMe")}</button>`}`);
+}
+MOUNT.cards = (params = {}) => {
+  const deck = deckFor(params.kind, params.key);
+  const i = Math.max(0, Math.min(deck.items.length - 1, params.i || 0));
+  const it = deck.items[i];
+  const flip = APP.querySelector("[data-flip]");
+  let x0 = null, moved = false;
+  flip.addEventListener("pointerdown", (e) => { x0 = e.clientX; moved = false; });
+  flip.addEventListener("pointermove", (e) => { if (x0 !== null && Math.abs(e.clientX - x0) > 12) moved = true; });
+  flip.addEventListener("pointerup", (e) => {
+    if (x0 === null) return;
+    const dx = e.clientX - x0; x0 = null;
+    if (Math.abs(dx) >= 50) { // swipe between cards
+      if (dx < 0 && i < deck.items.length - 1) replace("cards", { ...params, i: i + 1 });
+      if (dx > 0 && i > 0) replace("cards", { ...params, i: i - 1 });
+      return;
+    }
+    if (!moved) { flip.classList.toggle("flipped"); sfx("tap"); }
+  });
+  speak(it.speak, _lang);
+  bindAction(APP, "card-prev", () => replace("cards", { ...params, i: i - 1 }));
+  bindAction(APP, "card-next", () => replace("cards", { ...params, i: i + 1 }));
+  bindAction(APP, "card-say", () => speak(it.speak, _lang));
+  bindAction(APP, "card-quiz", () => {
+    if (!scopeAllowed(deck.scope)) return;
+    const items = new Set(deck.items.map((x) => String(x.id)));
+    const qs = buildQuestionList({ scope: deck.scope, types: deck.types, count: Math.min(10, Math.max(5, deck.items.length)), adaptive: true, items });
+    if (!qs.length) { toast("…"); return; }
+    startSession({ title: deck.title, questions: qs, clock: false, daily: false });
+  });
+};
+
 /* ---------- clock mode ---------- */
 function screenClock() {
   return html(`<div class="card q-prompt">⏱️ ${t("clock")}</div>
@@ -1129,41 +1297,38 @@ MOUNT.daily = (p) => {
 };
 
 /* ---------- question building ---------- */
-function buildQuestionList({ scope, types, count, adaptive }) {
+/* `items` (optional Set of ids) restricts the pool to those entities — used
+   by Learn mode's "quiz me on these cards". */
+function buildQuestionList({ scope, types, count, adaptive, items }) {
   let pool = [];
   if (scope === "bd" || scope === "both") {
-    for (const ty of ["bd-hq", "bd-fact", "bd-find"]) if (types.includes(ty)) pool.push(...divQuestions(ty));
+    for (const ty of ["bd-hq", "bd-fact", "bd-find", "bd-type"]) if (types.includes(ty)) pool.push(...divQuestions(ty));
     for (const ty of ["d-div", "div-d", "d-find"]) if (types.includes(ty)) pool.push(...distQuestions(ty));
   }
   if (scope === "world" || scope === "both") {
-    for (const ty of ["wf", "wc", "wh", "hc", "world-find"]) if (types.includes(ty)) pool.push(...countryQuestions(ty));
+    for (const ty of ["wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt"]) if (types.includes(ty)) pool.push(...countryQuestions(ty));
   }
+  if (items) pool = pool.filter((q) => items.has(String(q.itemId || q.answerId)));
   if (!pool.length) return [];
   const p = profile();
-  const qKey = (q) => itemKey(q.type, q.itemId || q.answerId);
-  if (adaptive) {
-    const w = pool.map((q) => {
-      const s = p.itemStats[qKey(q)];
-      return 1 + (s ? Math.pow(s.a - s.ok, 2) : 0);
-    });
-    // weighted shuffle: Fisher–Yates with weights
-    const arr = pool.slice();
+  if (adaptive && p) {
+    // weighted draw without replacement by SRS weight, then avoid asking the
+    // same entity twice in a row
+    const arr = pool.map((q) => ({ q, w: srsWeight(p, q) }));
     const out = [];
     while (arr.length) {
-      const total = arr.reduce((sum, q) => sum + (1 + (p.itemStats[qKey(q)] ? Math.pow(p.itemStats[qKey(q)].a - p.itemStats[qKey(q)].ok, 2) : 0)), 0);
-      let r = Math.random() * total, pick = 0;
-      for (let i = 0; i < arr.length; i++) {
-        const q = arr[i];
-        const ww = 1 + (p.itemStats[qKey(q)] ? Math.pow(p.itemStats[qKey(q)].a - p.itemStats[qKey(q)].ok, 2) : 0);
-        r -= ww;
-        if (r <= 0) { pick = i; break; }
-      }
-      out.push(arr.splice(pick, 1)[0]);
+      const total = arr.reduce((sum, x) => sum + x.w, 0);
+      let r = Math.random() * total, pick = arr.length - 1;
+      for (let i = 0; i < arr.length; i++) { r -= arr[i].w; if (r <= 0) { pick = i; break; } }
+      out.push(arr.splice(pick, 1)[0].q);
     }
     pool = out;
   } else {
     pool = shuffle(pool);
   }
+  const seen = new Set(), spaced = [];
+  for (const q of pool) { const k = q.itemId || q.answerId; if (spaced.length && k === (spaced[spaced.length - 1].itemId || spaced[spaced.length - 1].answerId)) continue; spaced.push(q); }
+  pool = spaced;
   if (count > 0) return pool.slice(0, count);
   return pool.slice(0, Math.max(20, Math.min(pool.length, 40)));
 }
@@ -1196,6 +1361,10 @@ function divQuestions(ty) {
     if (ty === "bd-find") {
       return { type: "bd-find", kind: "map", map: "bd", answerId: d.id, prompt: tvar("findPromptBD", { X: name(d) }) };
     }
+    if (ty === "bd-type") {
+      return { type: "bd-type", kind: "type", answerId: d.id, prompt: tvar("qprompts.bd-type", { X: _lang === "bn" ? d.hqBn : d.hq }),
+        accept: [d.en, d.bn], answerLabel: name(d) };
+    }
     return null;
   }).filter(Boolean);
 }
@@ -1210,8 +1379,59 @@ function countryQuestions(ty) {
       if (c.hasMap === false) return null; // microstates/islands absent from the 110m map — can't be tapped
       return { type: "world-find", kind: "map", map: "world", answerId: c.id, prompt: tvar("findPromptWorld", { X: cname(c) }) };
     }
+    if (ty === "wn") { // which country borders X?
+      const nb = (c.neighbors || []).map((n) => CTRY.find((x) => x.en === n)).filter(Boolean);
+      if (!nb.length) return null;
+      const ans = nb[Math.floor(Math.random() * nb.length)];
+      const nbIds = new Set(nb.map((x) => x.id));
+      const others = shuffle(CTRY.filter((x) => x.id !== c.id && !nbIds.has(x.id) && x.region === c.region)).slice(0, 3);
+      while (others.length < 3) { const o = CTRY[Math.floor(Math.random() * CTRY.length)]; if (o.id !== c.id && !nbIds.has(o.id) && !others.includes(o)) others.push(o); }
+      return { type: "wn", kind: "text", answerId: ans.id, itemId: c.id, prompt: tvar("qprompts.wn", { X: cname(c) }),
+        choices: shuffle([ans, ...others]).map((x) => ({ id: x.id, label: cname(x) })) };
+    }
+    if (ty === "wb") { // which is bigger? (areas at least 1.6× apart so it is fair)
+      const cand = CTRY.filter((x) => x.id !== c.id && x.area && c.area && (x.area / c.area >= 1.6 || c.area / x.area >= 1.6) && x.region === c.region);
+      const o = (cand.length ? cand : CTRY.filter((x) => x.id !== c.id && x.area))[Math.floor(Math.random() * (cand.length || CTRY.length - 1))];
+      if (!o) return null;
+      const big = c.area >= o.area ? c : o;
+      return { type: "wb", kind: "text", answerId: big.id, itemId: c.id, prompt: t("qprompts.wb"),
+        choices: shuffle([c, o]).map((x) => ({ id: x.id, label: cname(x), flag: false })), twoUp: true, explain: `${cname(c)}: ${fmtNum(c.area)} km² · ${cname(o)}: ${fmtNum(o.area)} km²` };
+    }
+    if (ty === "wt") { // flag → type the country
+      return { type: "wt", kind: "type", flagCode: c.flagCode, answerId: c.id, prompt: t("qprompts.wt"),
+        accept: [c.en, c.bn, c.official].filter(Boolean), answerLabel: cname(c) };
+    }
     return null;
   }).filter(Boolean);
+}
+/* typed answers: case/space/punctuation-insensitive; Latin gets one typo of
+   slack from 5 letters up, Bangla is compared exactly after normalisation */
+function normAnswer(str) {
+  return String(str || "").normalize("NFC").toLowerCase().replace(/[\u200c\u200d\u0964\u0965.,'’`\-]/g, "").replace(/\s+/g, " ").trim();
+}
+function editDistance(a, b) {
+  const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+function typedMatches(typed, accept) {
+  const tN = normAnswer(typed);
+  if (!tN) return false;
+  for (const a of accept) {
+    const aN = normAnswer(a);
+    if (!aN) continue;
+    if (tN === aN) return true;
+    const latin = /^[a-z0-9 ]+$/.test(aN);
+    if (latin && aN.length >= 5 && editDistance(tN, aN) <= 1) return true;
+    // "the gambia" / "gambia", "republic of x" / "x"
+    if (latin && (aN.replace(/^the /, "") === tN || tN.replace(/^the /, "") === aN)) return true;
+  }
+  return false;
 }
 function fillChoices(pool, answer, labelFn, opts = {}) {
   const N = opts.n || 3;
@@ -1295,6 +1515,8 @@ MOUNT.session = function (conf) {
       inner = mapQuestionHTML(s, q, n);
     } else if (q.kind === "flag" || q.kind === "flagchoice") {
       inner = flagQuestionHTML(s, q, n);
+    } else if (q.kind === "type") {
+      inner = typeQuestionHTML(s, q, n);
     } else {
       inner = textQuestionHTML(s, q, n);
     }
@@ -1302,6 +1524,7 @@ MOUNT.session = function (conf) {
     if (!rootEl) { rootEl = document.createElement("div"); rootEl.id = "q-root"; APP.appendChild(rootEl); }
     rootEl.innerHTML = inner;
     if (q.kind === "map") mountMapQuestion(s, q);
+    else if (q.kind === "type") mountTypeQuestion(s, q);
     else mountChoiceQuestion(s, q);
     if (s.conf.clock) startClock(s);
   }
@@ -1338,6 +1561,37 @@ function mapQuestionHTML(s, q, n) {
       ${mapControlsHTML()}
       <div class="map-hint">${t("map.hint.quiz")}</div>
     </div>`;
+}
+function typeQuestionHTML(s, q, n) {
+  const flag = q.flagCode ? `<img class="q-flag" src="${flagUrl(q.flagCode)}" alt="?" onerror="this.remove()">` : "";
+  return `${qHead(s)}${qBar(s)}
+    <div class="q-prompt">${q.prompt}</div>
+    ${flag}
+    <form class="type-form" data-typeform="1" autocomplete="off">
+      <input class="type-inp" data-typeinp="1" type="text" inputmode="text" autocapitalize="words" autocomplete="off" spellcheck="false" enterkeyhint="done" placeholder="${t("typeHere")}" lang="${_lang === "bn" ? "bn" : "en"}">
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-sun" type="submit">✓ ${t("check")}</button>
+        <button class="btn btn-paper btn-small" type="button" data-action="type-giveup">${t("showMe")}</button>
+      </div>
+    </form>
+    <div class="type-answer hidden" data-typeans="1"></div>`;
+}
+function mountTypeQuestion(s, q) {
+  const form = APP.querySelector("[data-typeform]");
+  const inp = APP.querySelector("[data-typeinp]");
+  setTimeout(() => { try { inp.focus(); } catch {} }, 60);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (s.answered !== s.idx) return;
+    const typed = inp.value;
+    if (!normAnswer(typed)) return;
+    const ok = typedMatches(typed, q.accept || []);
+    answerSession(s, q, ok ? q.answerId : "typed:" + typed, inp, q.answerId);
+  });
+  bindAction(APP, "type-giveup", () => {
+    if (s.answered !== s.idx) return;
+    answerSession(s, q, "typed:", inp, q.answerId);
+  });
 }
 function mountChoiceQuestion(s, q) {
   APP.querySelectorAll(".choice").forEach((btn) => {
@@ -1380,14 +1634,16 @@ function answerSession(s, q, pick, spot, correctId) {
   applyFeedback(q, ok, pick, spot);
   if (ok) sfx("correct"); else sfx("wrong");
   if (S.conf.clock && ok) { stopClockForNiceMoment(); }
-  setTimeout(() => { if (s.over) return; s.idx++; showNext(s); }, ok ? 950 : 1800);
+  setTimeout(() => { if (s.over) return; s.idx++; showNext(s); }, ok ? (q.kind === "type" ? 1200 : 950) : (q.kind === "type" || q.explain ? 2400 : 1800));
+}
+function entTypeOf(q) {
+  if (q.type === "bd-hq" || q.type === "bd-fact" || q.type === "bd-type" || q.map === "bd") return "d";
+  if (q.type === "d-div" || q.type === "div-d" || q.type === "d-find" || q.map === "bd-d") return "z";
+  return "c";
 }
 function bumpAndStars(p, q, ok) {
   const ansId = q.itemId || q.answerId;
-  let entType;
-  if (q.type === "bd-hq" || q.type === "bd-fact" || q.map === "bd") entType = "d";
-  else if (q.type === "d-div" || q.type === "div-d" || q.type === "d-find" || q.map === "bd-d") entType = "z";
-  else entType = "c";
+  const entType = entTypeOf(q);
   bumpItem(p, entType, ansId, ok);
   addStars(p, entType, ansId, ok);
 }
@@ -1411,6 +1667,12 @@ function applyFeedback(q, ok, pick, spot) {
         viewAnimateTo(canvas, md, to, redraw, 500);
       }
     }
+  } else if (q.kind === "type") {
+    const inp = APP.querySelector("[data-typeinp]");
+    const ans = APP.querySelector("[data-typeans]");
+    if (inp) { inp.disabled = true; inp.classList.add(ok ? "ok" : "bad"); }
+    APP.querySelectorAll("[data-typeform] .btn").forEach((b) => { b.disabled = true; });
+    if (ans) { ans.classList.remove("hidden"); ans.innerHTML = `${ok ? "✅" : "✏️"} <b>${q.answerLabel}</b>`; ans.classList.add(ok ? "ok" : "bad"); }
   } else {
     APP.querySelectorAll(".choice").forEach((btn) => {
       btn.classList.add("dis");
@@ -1418,10 +1680,12 @@ function applyFeedback(q, ok, pick, spot) {
       if (id === q.answerId) btn.classList.add("ok");
       else if (id === pick) btn.classList.add("bad");
     });
+    if (q.explain) { const ex = html(`<p class="q-explain">${q.explain}</p>`).firstElementChild; APP.querySelector(".choices")?.after(ex); }
   }
   const rightLabel = q.kind === "map"
     ? (q.map === "bd-d" ? (distIdx[q.answerId] ? dname(distIdx[q.answerId]) : q.answerId)
        : q.map === "bd" ? name(divIdx[q.answerId]) : cname(ctryIdx[q.answerId]))
+    : q.kind === "type" ? q.answerLabel
     : (q.choices.find((c) => c.id === q.answerId) || { label: "" }).label;
   if (ok) {
     toast("✅ " + t("correct"));
@@ -1543,7 +1807,7 @@ function screenResults(params) {
         } else {
           correctName = cname(ctryIdx[correctId]);
         }
-        const lbl = q.choices ? (q.choices.find((c) => c.id === correctId) || { label: correctName }).label : correctName;
+        const lbl = q.answerLabel || (q.choices ? (q.choices.find((c) => c.id === correctId) || { label: correctName }).label : correctName);
         const icon = q.kind === "map" ? "📍 " : q.kind === "flag" ? `🏳️ ` : q.flagCode ? "❤️ " : "💬 ";
         return `<li style="margin:6px 0"><span class="qw">${q.prompt.replace(/^❓\s*/, "").slice(0, 70)}</span><br><span class="qa">✅ ${icon}${lbl}</span></li>`;
       }).join("")}</ul>
@@ -2366,4 +2630,4 @@ function boot() {
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED };
+export const __test = { typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED };

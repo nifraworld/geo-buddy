@@ -276,6 +276,42 @@ h3{color:var(--green-2);}
 .flash-zone{display:grid;place-items:center;min-height:52vh;text-align:center;}
 .q-timer{width:100%;text-align:right;font-weight:800;color:var(--sun);font-size:18px;}
 
+/* ---------- typed answers ---------- */
+.type-form{margin-top:10px;}
+.type-inp{width:100%;padding:14px 16px;border:2px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);
+  font-family:var(--display);font-size:20px;font-weight:700;text-align:center;}
+.type-inp:focus{outline:none;border-color:var(--saffron);}
+.type-inp.ok{border-color:var(--good);background:var(--ok-bg);}
+.type-inp.bad{border-color:var(--bad);background:var(--bad-bg);animation:shake .3s ease;}
+.type-answer{text-align:center;font-size:18px;margin-top:12px;padding:10px;border-radius:12px;}
+.type-answer.ok{background:var(--ok-bg);color:var(--good);}
+.type-answer.bad{background:var(--bad-bg);color:var(--bad);}
+.type-answer b{font-family:var(--display);font-size:22px;color:var(--green);}
+.q-explain{text-align:center;font-size:13px;color:var(--ink-soft);margin-top:10px;}
+
+/* ---------- learn: decks & flip cards ---------- */
+.deck-list{margin-top:8px;}
+.item.deck .ring{font-size:18px;}
+.item.deck .st{color:var(--ink-soft);font-size:14px;}
+.flip{perspective:1200px;margin:12px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:pan-y;}
+.flip-inner{position:relative;width:100%;min-height:330px;transition:transform .5s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d;}
+.flip.flipped .flip-inner{transform:rotateY(180deg);}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--paper);border:2px solid var(--line);
+  border-radius:22px;box-shadow:var(--shadow);padding:22px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;overflow:hidden;}
+.face:before{content:'';position:absolute;left:0;right:0;top:0;height:8px;background:var(--accent);}
+.face.back{transform:rotateY(180deg);justify-content:flex-start;padding-top:24px;text-align:left;align-items:stretch;overflow-y:auto;}
+.card-flag{width:min(70%,220px);border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.08),var(--shadow);}
+.card-swatch{width:110px;height:110px;border-radius:32px;box-shadow:var(--shadow);}
+.card-name{font-family:var(--display);font-size:30px;font-weight:800;color:var(--green);line-height:1.15;}
+.card-name.sm{font-size:22px;margin-bottom:4px;}
+.card-sub{font-size:14px;color:var(--ink-soft);}
+.flip-hint{font-size:11px;color:var(--ink-soft);opacity:.8;margin-top:8px;}
+.face.back .stat-grid{margin:6px 0;}
+.face.back .factbox{font-size:13px;}
+.card-nav .btn{padding:14px 10px;}
+.card-nav .btn[disabled]{opacity:.35;}
+@media (prefers-reduced-motion:reduce){ .flip-inner{transition:none;} }
+
 /* ---------- results ---------- */
 .results{text-align:center;padding-top:20px;}
 .results .big{font-size:64px;line-height:1;}
