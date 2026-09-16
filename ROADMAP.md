@@ -123,6 +123,12 @@ geo.nifraworld.com root
     next question onto whatever screen came next.
   - Follow-ups: label anchor audit (Canada/France anchors sit low), Robinson
     projection, coastline/graticule styling, BD district framing option.
+- **V1.5.1** Update flow + visible version. ✅
+  - The SW is cache-first and nothing ever told the phone a new build existed, so
+    a deploy only appeared on the *second* cold launch. Now: `reg.update()` when the
+    app returns to the foreground (and every 30 min); on `controllerchange` the app
+    reloads on a quiet screen or shows a tap-to-update toast mid-quiz.
+  - Version shown in the Home footer and the Parent Zone title (About keeps it too).
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

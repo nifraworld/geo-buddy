@@ -74,6 +74,7 @@ const L = {
     "map.hint.bd": "Tap a division to explore",
     "map.hint.bdd": "Tap a district to explore",
     licNeeded: "Ask a parent to activate a key for this section",
+    updateReady: "New version ready — tap to update",
     "map.hint.world": "Tap a country to explore",
     "map.hint.quiz": "Tap the correct place on the map",
     back: "Back",
@@ -169,6 +170,7 @@ const L = {
     "map.hint.bd": "বিভাগে স্পর্শ করো",
     "map.hint.bdd": "জেলায় স্পর্শ করো",
     licNeeded: "এই অংশের জন্য অভিভাবককে কী চালু করতে বলো",
+    updateReady: "নতুন সংস্করণ প্রস্তুত — আপডেট করতে স্পর্শ করো",
     "map.hint.world": "দেশে স্পর্শ করো",
     "map.hint.quiz": "সঠিক স্থানে স্পর্শ করো",
     back: "ফিরে যাও",
@@ -685,7 +687,8 @@ function screenHome() {
       <button class="mode-card" data-nav="daily"><div class="em">📅</div><div class="tt">${t("daily")}</div><div class="ds">${t("dailySub")}</div></button>
       <button class="mode-card" data-nav="map"><div class="em">🧭</div><div class="tt">${t("map")}</div><div class="ds">${t("mapSub")}</div></button>
       <button class="mode-card pin" data-nav="parent"><div class="em">🔒</div><div class="tt">${t("parentZone")}</div><div class="ds">${t("pinTitle")}</div></button>
-    </div>`);
+    </div>
+    <p class="foot">geobuddy.nifraworld.com · v${GEO.version || ""}</p>`);
 }
 MOUNT.home = (p) => {};
 
@@ -1972,7 +1975,7 @@ function licCard() {
 function screenParent() {
   const p = profile();
   return html(`
-    <h2 class="sec-title">🔓 ${t("parentZone")}</h2>
+    <h2 class="sec-title">🔓 ${t("parentZone")} <small class="ver">v${GEO.version || ""}</small></h2>
     <div class="card">
       <h3>${t("settings")}</h3>
       <div class="setting">
@@ -2168,13 +2171,42 @@ document.addEventListener("click", (e) => {
 });
 
 /* ================= boot ================= */
+/* A persistent, tappable toast (the normal one fades and ignores taps). */
+function toastAction(msg, fn) {
+  const box = $id("toasts");
+  box.querySelectorAll(".toast-act").forEach((x) => x.remove());
+  const el = html(`<button class="toast toast-act">${msg}</button>`).firstElementChild;
+  el.addEventListener("click", () => { el.remove(); fn(); });
+  box.appendChild(el);
+}
+/* Service worker + update flow. The SW is cache-first, so without this a new
+   build only shows up on the second cold launch after it was deployed — and a
+   PWA left in the background never checks at all. We look for an update when
+   the app comes to the foreground, and when the new worker takes control we
+   reload on a quiet screen or offer a tap-to-update mid-quiz. */
+function setupServiceWorker() {
+  if (!("serviceWorker" in navigator) || !navigator.serviceWorker || !location.protocol.startsWith("http")) return;
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register("sw.js").then((reg) => {
+    const check = () => { try { reg.update(); } catch {} };
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") check(); });
+    setInterval(check, 30 * 60 * 1000);
+  }).catch(() => {});
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloading) return; // first install: nothing to swap
+    const cur = stack[stack.length - 1];
+    const quiet = !cur || ["welcome", "who", "home", "play", "explore", "map", "parent", "about", "daily", "custom", "clock", "results", "detail"].includes(cur.name);
+    const doReload = () => { reloading = true; location.reload(); };
+    if (quiet) doReload();
+    else toastAction("🔄 " + t("updateReady"), doReload);
+  });
+}
 function boot() {
   load();
   if (licence().key) refreshLicence(true);
   go("welcome");
-  if ("serviceWorker" in navigator && navigator.serviceWorker && location.protocol.startsWith("http")) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  }
+  setupServiceWorker();
 }
 boot();
 
