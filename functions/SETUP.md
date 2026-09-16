@@ -2,8 +2,8 @@
 
 Geo Buddy's activation keys are checked on the server. The secret that makes
 a key (`LICENCE_SECRET`) lives **only** in Cloudflare. Keys are generated on
-the server too, from the admin page — nothing secret is in the app, the page
-source, or this repo.
+the server too, from the private admin page on your laptop — nothing secret is in the app,
+the website, or this repo.
 
 Until the steps below are done the app is unaffected: it runs open
 (`sale.json` → `locked: false`), and a key typed in goes unactivated
@@ -46,8 +46,9 @@ Until the steps below are done the app is unaffected: it runs open
 - `https://geobuddy.nifraworld.com/api/licence?email=you@example.com&device=test`
   → JSON starting `{"ok":true,…}`. `"pending":true` means the D1 binding or a
   fresh redeploy is missing.
-- `https://geobuddy.nifraworld.com/admin` → type `REVIEW_KEY` → "No customers
-  yet". "backend not set up yet" = binding missing; "Wrong password" = key mismatch.
+- Open `admin-tools/ADMIN-keep-private.html` on your laptop (double-click) → type
+  `REVIEW_KEY` → "No customers yet". "backend not set up yet" = binding missing;
+  "Wrong password" = key mismatch.
 
 ## Selling flow
 
@@ -66,7 +67,7 @@ Until the steps below are done the app is unaffected: it runs open
    worker.
 
 2. **A parent pays** by bKash and messages you (the WhatsApp button prefills
-   the message). Open `/admin` → **Make a key** → email, what they bought
+   the message). Open `admin-tools/ADMIN-keep-private.html` → **Make a key** → email, what they bought
    (bundle / Bangladesh / World), plan (3 / 10 / 25 / 50 / ∞ devices),
    WhatsApp number → **Make key**. Copy the key or tap **Send on WhatsApp**.
    Mark them **paid** in the Customers tab.
@@ -96,7 +97,8 @@ classroom features on — it does not change entitlements by itself.
 | `POST/GET /api/progress` | app / teacher / admin | per-pupil progress for class dashboards |
 | `POST /api/submit` | app | "Report a mistake" |
 | `GET/POST /api/review` | admin page | list / accept / reject submissions |
-| `GET /admin` | you | the admin page (password = `REVIEW_KEY`) |
 
-The old private key-generator HTML in `admin-tools/` still works offline as
-a fallback if you paste the secret in, but the admin page is the tool now.
+The admin page is `admin-tools/ADMIN-keep-private.html` on your laptop (git-ignored,
+never on the website). It talks to the endpoints above with your `REVIEW_KEY`.
+The older `KEY-GENERATOR-keep-private.html` still works offline if you paste the
+secret in, as a fallback.

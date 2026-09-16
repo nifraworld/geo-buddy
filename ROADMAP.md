@@ -185,7 +185,8 @@ geo.nifraworld.com root
     flipping `sale.json`. bKash *API* integration deliberately skipped — manual
     confirmation via the admin page fits the volume.
 - **V1.9** Admin parity with Spelling Buddy. ✅
-  - `/admin` tabs: **Dashboard** (customers, paid, ৳ recorded, devices, active this
+  - Admin page moved off the website to `admin-tools/ADMIN-keep-private.html`
+    (git-ignored, opened locally; same endpoints, same `REVIEW_KEY`). Tabs: **Dashboard** (customers, paid, ৳ recorded, devices, active this
     week, activations 7/30d, app versions, needs-attention), Customers, Make a key,
     **Class dashboards** (per-pupil level/accuracy/areas/stars/streak/badges/weak
     spots, CSV), **Submissions** (pending badge, accept/reject, bulk, "copy accepted
