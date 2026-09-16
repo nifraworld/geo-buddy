@@ -129,6 +129,19 @@ geo.nifraworld.com root
     app returns to the foreground (and every 30 min); on `controllerchange` the app
     reloads on a quiet screen or shows a tap-to-update toast mid-quiz.
   - Version shown in the Home footer and the Parent Zone title (About keeps it too).
+- **V1.6** Home + Results redesign, motion. ✅
+  - Home leads with what to do next: daily-challenge card (done/undone), XP bar to
+    the next level, nearest unearned badge with progress, and a one-tap "practise
+    your weak spot" that picks the weakest content area (<75% over ≥5 tries) or the
+    least-played one. Compact 3-across mode row.
+  - Results: stars pop in sequence, score, level-up banner, XP bar animating from the
+    session's start, "You got these right" chips (flags / division swatches), review
+    list, share on its own row.
+  - Motion layer: screen-in, press states, correct pop / wrong shake; honours
+    `prefers-reduced-motion`.
+  - Fixed: level-up never fired (level compared after stats were already bumped);
+    badges are also awarded when Home renders, not only at quiz end.
+  - Open: Bangla greeting নমস্কার → consider হ্যালো/শুভেচ্ছা (neutral).
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

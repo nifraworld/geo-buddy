@@ -50,7 +50,7 @@ const L = {
     "welcome.start": "Start exploring",
     langSwitch: "বাংলা",
     hello: "Hello", helloDone: "Great job",
-    navHome: "Home", navPlay: "Play", navExplore: "Explore", navParent: "Parents",
+    navHome: "Home", navPlay: "Play", navExplore: "Explore", navParent: "Parents", navMap: "Map",
     explore: "Explore", exploreSub: "Browse divisions & countries, see photos and fun facts",
     play: "Play", playSub: "Quizzes, flags, find-on-map & daily challenge",
     map: "Map Explorer", mapSub: "Tap divisions and countries on the map",
@@ -66,7 +66,7 @@ const L = {
     correct: "Correct!", wrong: "Oops!",
     score: "Score", answered: "Answered", best: "Best",
     "results.great": "Amazing!", "results.good": "Well done!", "results.keep": "Keep practising!",
-    again: "Play again", home: "Home",
+    again: "Play again", home: "Home", share: "Share result",
     streakFlame: "day streak", dailyDone: "Daily done today!",
     "daily.title": "Daily Challenge",
     "daily.notyet": "Finish today's challenge to earn today's streak.",
@@ -75,6 +75,10 @@ const L = {
     "map.hint.bdd": "Tap a district to explore",
     licNeeded: "Ask a parent to activate a key for this section",
     updateReady: "New version ready — tap to update",
+    homeDailyDone: "Come back tomorrow to keep your {n}-day streak",
+    sugWeak: "Practise your weak spot", sugNew: "Try something new", sugStart: "Start here",
+    sugDivisions: "Bangladesh divisions", sugDistricts: "Bangladesh districts", sugWorld: "World flags, capitals & map",
+    learned: "You got these right:", xpGained: "+{n} XP", levelUpTitle: "Level {n}!",
     "map.hint.world": "Tap a country to explore",
     "map.hint.quiz": "Tap the correct place on the map",
     back: "Back",
@@ -146,7 +150,7 @@ const L = {
     "welcome.start": "শুরু করি",
     langSwitch: "English",
     hello: "নমস্কার", helloDone: "দারুণ!",
-    navHome: "হোম", navPlay: "খেলা", navExplore: "ঘুরে দেখি", navParent: "অভিভাবক",
+    navHome: "হোম", navPlay: "খেলা", navExplore: "ঘুরে দেখি", navParent: "অভিভাবক", navMap: "মানচিত্র",
     explore: "ঘুরে দেখি", exploreSub: "বিভাগ ও দেশ ঘুরে দেখো, ছবি এবং মজার তথ্য",
     play: "খেলা", playSub: "কুইজ, পতাকা, মানচিত্র ও দৈনিক চ্যালেঞ্জ",
     map: "মানচিত্র", mapSub: "মানচিত্রে বিভাগ ও দেশ স্পর্শ করো",
@@ -162,7 +166,7 @@ const L = {
     correct: "সঠিক!", wrong: "উফ!",
     score: "স্কোর", answered: "উত্তর", best: "সেরা",
     "results.great": "অসাধারণ!", "results.good": "সাবাশ!", "results.keep": "আরও অনুশীলন করো!",
-    again: "আবার খেলি", home: "হোম",
+    again: "আবার খেলি", home: "হোম", share: "ফলাফল শেয়ার",
     streakFlame: "দিনের ধারা", dailyDone: "আজকের চ্যালেঞ্জ শেষ!",
     "daily.title": "দৈনিক চ্যালেঞ্জ",
     "daily.notyet": "আজকের চ্যালেঞ্জ শেষ করো, ধারা গড়তে।",
@@ -171,6 +175,10 @@ const L = {
     "map.hint.bdd": "জেলায় স্পর্শ করো",
     licNeeded: "এই অংশের জন্য অভিভাবককে কী চালু করতে বলো",
     updateReady: "নতুন সংস্করণ প্রস্তুত — আপডেট করতে স্পর্শ করো",
+    homeDailyDone: "{n} দিনের ধারা ধরে রাখতে কাল আবার এসো",
+    sugWeak: "দুর্বল জায়গায় অনুশীলন করো", sugNew: "নতুন কিছু চেষ্টা করো", sugStart: "এখান থেকে শুরু",
+    sugDivisions: "বাংলাদেশের বিভাগ", sugDistricts: "বাংলাদেশের জেলা", sugWorld: "বিশ্বের পতাকা, রাজধানী ও মানচিত্র",
+    learned: "এগুলো ঠিক হয়েছে:", xpGained: "+{n} XP", levelUpTitle: "স্তর {n}!",
     "map.hint.world": "দেশে স্পর্শ করো",
     "map.hint.quiz": "সঠিক স্থানে স্পর্শ করো",
     back: "ফিরে যাও",
@@ -492,16 +500,16 @@ function sfxInit() { try { getAudio(); } catch {} }
 
 /* ================= badges & levels ================= */
 const BADGES = [
-  { id: "first-play",   icon: "🎯",  en: "First Shot",       bn: "প্রথম প্রয়াস",  descEn: "Complete your first quiz",                descBn: "প্রথম কুইজ সম্পন্ন করো",               test: (p) => p.stats.asked >= 1 },
+  { id: "first-play",   icon: "🎯",  en: "First Shot",       bn: "প্রথম প্রয়াস",  descEn: "Complete your first quiz",                descBn: "প্রথম কুইজ সম্পন্ন করো",               test: (p) => p.stats.asked >= 1, prog: (p) => [Math.min(1, p.stats.asked), 1] },
   { id: "perfect-10",   icon: "💯",  en: "Perfect!",         bn: "দারুণ!",         descEn: "Get 10/10 in a quiz",                     descBn: "কুইজে ১০/১০ পাও",                      test: (p) => p._best10 },
-  { id: "streak-3",     icon: "🔥",  en: "Streak Keeper",    bn: "ধারাবাহিক",      descEn: "3-day streak",                            descBn: "৩ দিনের ধারা",                          test: (p) => (p.daily.streak || 0) >= 3 },
-  { id: "streak-7",     icon: "🌋",  en: "Unstoppable",       bn: "অবরোধ্য",       descEn: "7-day streak",                            descBn: "৭ দিনের ধারা",                          test: (p) => (p.daily.streak || 0) >= 7 },
+  { id: "streak-3",     icon: "🔥",  en: "Streak Keeper",    bn: "ধারাবাহিক",      descEn: "3-day streak",                            descBn: "৩ দিনের ধারা",                          test: (p) => (p.daily.streak || 0) >= 3, prog: (p) => [p.daily.streak || 0, 3] },
+  { id: "streak-7",     icon: "🌋",  en: "Unstoppable",       bn: "অবরোধ্য",       descEn: "7-day streak",                            descBn: "৭ দিনের ধারা",                          test: (p) => (p.daily.streak || 0) >= 7, prog: (p) => [p.daily.streak || 0, 7] },
   { id: "flag-master",  icon: "🏁",  en: "Flag Master",      bn: "পতাকা মাস্টার",  descEn: "100% on a flag quiz",                     descBn: "পতাকা কুইজে ১০০%",                      test: (p) => !!p._flagMaster },
   { id: "map-master",   icon: "🗺️",  en: "Map Master",       bn: "মানচিত্র মাস্টার",descEn: "100% on a find-on-map quiz",               descBn: "মানচিত্র কুইজে ১০০%",                    test: (p) => !!p._mapMaster },
-  { id: "century",      icon: "💯",  en: "Century Club",     bn: "শতক",            descEn: "Answer 100 questions total",               descBn: "১০০টি প্রশ্নের উত্তর দাও",               test: (p) => p.stats.asked >= 100 },
-  { id: "star-30",      icon: "⭐",  en: "Star Collector",   bn: "তারা সংগ্রাহক",  descEn: "Earn 30 total stars",                     descBn: "৩০টি তারা অর্জন করো",                    test: (p) => totalStars(p) >= 30 },
-  { id: "star-100",     icon: "🌟",  en: "Constellation",    bn: "তারামণ্ডল",      descEn: "Earn 100 total stars",                    descBn: "১০০টি তারা অর্জন করো",                   test: (p) => totalStars(p) >= 100 },
-  { id: "explorer-20",  icon: "🌍",  en: "World Explorer",   bn: "বিশ্ব অনুসন্ধানী",descEn: "Favourite 20 countries",                  descBn: "২০টি দেশ পছন্দের তালিকায় যোগ করো",     test: (p) => countFavs(p, "c") >= 20 },
+  { id: "century",      icon: "💯",  en: "Century Club",     bn: "শতক",            descEn: "Answer 100 questions total",               descBn: "১০০টি প্রশ্নের উত্তর দাও",               test: (p) => p.stats.asked >= 100, prog: (p) => [p.stats.asked, 100] },
+  { id: "star-30",      icon: "⭐",  en: "Star Collector",   bn: "তারা সংগ্রাহক",  descEn: "Earn 30 total stars",                     descBn: "৩০টি তারা অর্জন করো",                    test: (p) => totalStars(p) >= 30, prog: (p) => [totalStars(p), 30] },
+  { id: "star-100",     icon: "🌟",  en: "Constellation",    bn: "তারামণ্ডল",      descEn: "Earn 100 total stars",                    descBn: "১০০টি তারা অর্জন করো",                   test: (p) => totalStars(p) >= 100, prog: (p) => [totalStars(p), 100] },
+  { id: "explorer-20",  icon: "🌍",  en: "World Explorer",   bn: "বিশ্ব অনুসন্ধানী",descEn: "Favourite 20 countries",                  descBn: "২০টি দেশ পছন্দের তালিকায় যোগ করো",     test: (p) => countFavs(p, "c") >= 20, prog: (p) => [countFavs(p, "c"), 20] },
 ];
 function totalStars(p) { return Object.values(p.stars || {}).reduce((s, v) => s + v, 0); }
 function countFavs(p, kind) {
@@ -519,6 +527,41 @@ function checkBadges(p) {
   return newBadges;
 }
 function getXP(p) { return (p.stats.correct || 0) * 10; }
+function levelForXP(xp) { let lv = 1; while (xp >= lv * lv * 50) lv++; return lv; }
+/* the unearned badge the child is closest to, with its progress */
+function nextBadge(p) {
+  let best = null;
+  for (const b of BADGES) {
+    if (!b.prog || (p.badges && p.badges[b.id]) || b.test(p)) continue;
+    const [cur, tot] = b.prog(p);
+    const r = Math.min(1, cur / tot);
+    if (!best || r > best.r) best = { b, cur, tot, r };
+  }
+  return best;
+}
+/* accuracy per content area (divisions / districts / countries) from item stats */
+function areaStats(p) {
+  const out = { d: { a: 0, ok: 0 }, z: { a: 0, ok: 0 }, c: { a: 0, ok: 0 } };
+  for (const [k, v] of Object.entries(p.itemStats || {})) {
+    const ty = k.split("|")[0];
+    if (out[ty]) { out[ty].a += v.a; out[ty].ok += v.ok; }
+  }
+  return out;
+}
+/* what to practise next: the weakest area with enough attempts, else the
+   area least played. Returns { scope, types, key } for a one-tap session. */
+function suggestPractice(p) {
+  const st = areaStats(p);
+  const areas = [
+    { ty: "d", scope: "bd", types: ["bd-hq", "bd-fact", "bd-find"], key: "sugDivisions" },
+    { ty: "z", scope: "bd", types: ["d-div", "div-d", "d-find"], key: "sugDistricts" },
+    { ty: "c", scope: "world", types: ["wf", "wh", "world-find"], key: "sugWorld" },
+  ];
+  const tried = areas.filter((a) => st[a.ty].a >= 5).map((a) => ({ ...a, acc: st[a.ty].ok / st[a.ty].a }));
+  const weak = tried.filter((a) => a.acc < 0.75).sort((a, b) => a.acc - b.acc)[0];
+  if (weak) return { ...weak, weak: true };
+  return areas.sort((a, b) => st[a.ty].a - st[b.ty].a)[0];
+}
 function getLevel(p) { const xp = getXP(p); let lv = 1; while (xp >= lv * lv * 50) lv++; return lv; }
 function xpForNext(p) { const lv = getLevel(p); return lv * lv * 50; }
 
@@ -619,7 +662,7 @@ function render(name, params) {
   const top = name === "welcome" || name === "pin" ? `<div class="site-tag-float">${siteTag()}</div>` : fillTopbar(name !== "who");
   document.title = name === "map" ? "Map — Geo Buddy" : "Geo Buddy";
   const node = sub(params);
-  APP.innerHTML = top + htmlStr(node);
+  APP.innerHTML = top + `<div class="screen-in">${htmlStr(node)}</div>`;
   window.scrollTo(0, 0);
   const hook = MOUNT[name];
   if (hook) hook(params);
@@ -672,25 +715,61 @@ function screenHome() {
   const streak = act.daily.streak || 0;
   const doneToday = act.daily.last === todayKey();
   const greet = doneToday ? t("helloDone") : t("hello");
+  const lv = getLevel(act), xp = getXP(act);
+  const lvStart = (lv - 1) * (lv - 1) * 50, lvEnd = lv * lv * 50;
+  const xpPct = Math.round(((xp - lvStart) / (lvEnd - lvStart)) * 100);
+  if (checkBadges(act).length) save(); // award anything earned since the last quiz ended
+  const nb = nextBadge(act);
+  const sug = suggestPractice(act);
+  const st = areaStats(act);
+  const played = st.d.a + st.z.a + st.c.a > 0;
   return html(`
     <div class="home-hero">
       <span class="avatar" style="background:${act.avatar.color}">${act.avatar.icon}</span>
-      <div>
+      <div class="hero-txt">
         <div class="greet">${greet}, ${act.name.split(" ")[0]}! 👋</div>
-        <div class="sub">${t("tagline")}</div>
+        <div class="xp-row"><span class="lv-pill">${t("level")} ${lv}</span><span class="xp-bar"><i style="width:${xpPct}%"></i></span><small>${xp - lvStart}/${lvEnd - lvStart} XP</small></div>
       </div>
       <div class="streak"><b>🔥${streak}</b><small>${t("streakFlame")}</small></div>
     </div>
-    <div class="mode-grid">
-      <button class="mode-card" data-nav="play"><div class="em">🎯</div><div class="tt">${t("play")}</div><div class="ds">${t("playSub")}</div></button>
-      <button class="mode-card" data-nav="explore"><div class="em">🗺️</div><div class="tt">${t("explore")}</div><div class="ds">${t("exploreSub")}</div></button>
-      <button class="mode-card" data-nav="daily"><div class="em">📅</div><div class="tt">${t("daily")}</div><div class="ds">${t("dailySub")}</div></button>
-      <button class="mode-card" data-nav="map"><div class="em">🧭</div><div class="tt">${t("map")}</div><div class="ds">${t("mapSub")}</div></button>
-      <button class="mode-card pin" data-nav="parent"><div class="em">🔒</div><div class="tt">${t("parentZone")}</div><div class="ds">${t("pinTitle")}</div></button>
+
+    <button class="next-card ${doneToday ? "done" : ""}" data-nav="daily">
+      <span class="nc-ico">${doneToday ? "✅" : "📅"}</span>
+      <span class="nc-txt"><b>${doneToday ? t("dailyDone") : t("daily")}</b><small>${doneToday ? tvar("homeDailyDone", { n: streak }) : t("dailySub")}</small></span>
+      <span class="nc-go">${doneToday ? "" : "▶"}</span>
+    </button>
+
+    <div class="goal-row">
+      ${nb ? `<div class="goal">
+        <span class="g-ico">${nb.b.icon}</span>
+        <span class="g-txt"><b>${_lang === "bn" ? nb.b.bn : nb.b.en}</b><small>${_lang === "bn" ? nb.b.descBn : nb.b.descEn}</small>
+        <span class="g-bar"><i style="width:${Math.round(nb.r * 100)}%"></i></span></span>
+        <span class="g-num">${nb.cur}/${nb.tot}</span>
+      </div>` : ""}
+      <button class="goal act" data-action="home-practise">
+        <span class="g-ico">${sug.weak ? "💪" : "✨"}</span>
+        <span class="g-txt"><b>${t(sug.weak ? "sugWeak" : played ? "sugNew" : "sugStart")}</b><small>${t(sug.key)}</small></span>
+        <span class="nc-go">▶</span>
+      </button>
     </div>
+
+    <div class="mode-grid three">
+      <button class="mode-card" data-nav="play"><div class="em">🎯</div><div class="tt">${t("play")}</div></button>
+      <button class="mode-card" data-nav="explore"><div class="em">🗺️</div><div class="tt">${t("explore")}</div></button>
+      <button class="mode-card" data-nav="map"><div class="em">🧭</div><div class="tt">${t("navMap")}</div></button>
+    </div>
+    <button class="mode-card pin wide" data-nav="parent"><span class="em">🔒</span><span><span class="tt">${t("parentZone")}</span><span class="ds">${t("pinTitle")}</span></span></button>
     <p class="foot">geobuddy.nifraworld.com · v${GEO.version || ""}</p>`);
 }
-MOUNT.home = (p) => {};
+MOUNT.home = (p) => {
+  bindAction(APP, "home-practise", () => {
+    const sug = suggestPractice(profile());
+    if (!scopeAllowed(sug.scope)) return;
+    SETUP.scope = sug.scope; SETUP.types = sug.types.slice(); SETUP.count = 10; SETUP.adaptive = !!sug.weak;
+    const qs = buildQuestionList({ scope: sug.scope, types: sug.types, count: 10, adaptive: !!sug.weak });
+    if (qs.length) startSession({ title: t(sug.key), questions: qs, clock: false, daily: false });
+  });
+};
 
 /* ---------- explore (library) ---------- */
 function screenExplore(params = {}) {
@@ -1178,7 +1257,8 @@ function screenSession() {
   return html("<div></div>");
 }
 function startSession(conf) {
-  S = { conf, idx: 0, correct: 0, wrong: [], answered: 0, startedAt: Date.now(), over: false, lastPicked: null, lastOK: false };
+  const p0 = profile();
+  S = { conf, idx: 0, correct: 0, wrong: [], right: [], answered: 0, startedAt: Date.now(), over: false, lastPicked: null, lastOK: false, startXP: p0 ? getXP(p0) : 0 };
   stack.push({ name: "session", params: {} });
   render("session");
   MOUNT.session(conf);
@@ -1269,7 +1349,7 @@ function answerSession(s, q, pick, spot, correctId) {
   if (s.answered > s.idx) return;
   s.answered = s.idx + 1;
   const ok = String(pick) === String(q.answerId);
-  if (ok) s.correct++;
+  if (ok) { s.correct++; s.right.push(q); }
   else s.wrong.push(q);
   s.lastPicked = pick; s.lastOK = ok;
   const p = profile();
@@ -1370,13 +1450,15 @@ function finish() {
       if (p.daily.streak > 1) sfx("streak");
     }
   }
-  const result = { pct, stars, correct: s.correct, total, wrong: s.wrong.slice(0, 8), daily: s.conf.daily, best: p.best || 0 };
+  const xpNow = getXP(p);
+  const result = { pct, stars, correct: s.correct, total, wrong: s.wrong.slice(0, 8), right: s.right.slice(0, 12), daily: s.conf.daily, best: p.best || 0,
+    xpFrom: s.startXP, xpTo: xpNow };
   const hasMapFind = s.conf.questions.some((q) => q.kind === "map");
   const hasFlag = s.conf.questions.some((q) => q.kind === "flag");
   if (hasFlag && pct === 100) p._flagMaster = true;
   if (hasMapFind && pct === 100) p._mapMaster = true;
   if (pct === 100 && total >= 10) p._best10 = true;
-  const oldLv = getLevel(p);
+  const oldLv = levelForXP(s.startXP); // level before this session (stats were bumped per answer)
   save();
   if (stars >= 2) confetti();
   sfx("finish");
@@ -1388,6 +1470,7 @@ function finish() {
     }, 1400);
   }
   const newLv = getLevel(p);
+  result.levelUp = newLv > oldLv ? newLv : 0;
   if (newLv > oldLv) {
     setTimeout(() => { sfx("levelUp"); toast(`⬆️ Level ${newLv}!`); confetti(); }, newBadges.length ? 2800 : 600);
   }
@@ -1396,10 +1479,37 @@ function finish() {
 }
 
 /* ---------- results ---------- */
+function itemChip(q) {
+  // a small labelled chip for a question's answer item: flag for countries,
+  // division colour swatch for BD
+  const id = q.itemId || q.answerId;
+  if (q.map === "bd" || q.type === "bd-hq" || q.type === "bd-fact") {
+    const d = divIdx[id]; return d ? `<span class="chip"><span class="sw" style="background:${DIV_PALETTE[d.id]}"></span>${name(d)}</span>` : "";
+  }
+  if (q.map === "bd-d" || q.type === "d-div" || q.type === "div-d" || q.type === "d-find") {
+    const d = distIdx[id]; return d ? `<span class="chip"><span class="sw" style="background:${DIV_PALETTE[d.div]}"></span>${dname(d)}</span>` : "";
+  }
+  const c = ctryIdx[id];
+  return c ? `<span class="chip"><img class="chip-flag" src="${flagUrl(c.flagCode)}" alt="">${cname(c)}</span>` : "";
+}
 function screenResults(params) {
   const r = params;
+  const p = profile();
   const emoticon = r.stars >= 3 ? "🏆" : r.stars === 2 ? "🎉" : r.stars === 1 ? "🙂" : "💪";
   const msg = r.stars >= 3 ? t("results.great") : r.stars === 2 ? t("results.good") : r.pct >= 50 ? t("results.good") : t("results.keep");
+  // XP bar: from the session's starting XP to now, within the *current* level's band
+  const xpTo = r.xpTo != null ? r.xpTo : getXP(p);
+  const xpFrom = r.xpFrom != null ? r.xpFrom : xpTo;
+  const lv = levelForXP(xpTo);
+  const lvStart = (lv - 1) * (lv - 1) * 50, lvEnd = lv * lv * 50;
+  const pctFrom = Math.max(0, Math.round(((xpFrom - lvStart) / (lvEnd - lvStart)) * 100));
+  const pctTo = Math.round(((xpTo - lvStart) / (lvEnd - lvStart)) * 100);
+  const gained = Math.max(0, xpTo - xpFrom);
+  const rightHTML = r.right && r.right.length ? `
+    <div class="card learned">
+      <h3>${t("learned")}</h3>
+      <div class="chips">${r.right.map(itemChip).join("")}</div>
+    </div>` : "";
   const wrongHTML = r.wrong.length ? `
     <div class="card" style="text-align:left">
       <h3>${t("wrongList")}</h3>
@@ -1409,7 +1519,7 @@ function screenResults(params) {
         if (q.map === "bd-d" || q.type === "d-div" || q.type === "d-find" || q.type === "div-d") {
           const dd = distIdx[correctId] || distIdx[q.answerId];
           correctName = dd ? dname(dd) : correctId;
-        } else if (q.type === "bd-fact" || (q.kind === "map" && q.map === "bd")) {
+        } else if (q.type === "bd-fact" || q.type === "bd-hq" || (q.kind === "map" && q.map === "bd")) {
           correctName = name(divIdx[correctId]);
         } else {
           correctName = cname(ctryIdx[correctId]);
@@ -1420,14 +1530,20 @@ function screenResults(params) {
       }).join("")}</ul>
       <button class="btn btn-paper btn-small" data-action="retry-wrong" style="margin-top:10px">${t("tryAgainBtn")}</button>
     </div>` : "";
-  const shareBtn = navigator.share ? `<button class="btn btn-paper" data-action="share-res" style="flex:1">📤 ${t("share")}</button>` : "";
+  const shareBtn = navigator.share ? `<button class="btn btn-paper share-btn" data-action="share-res">📤 ${t("share")}</button>` : "";
   const retryAction = r.daily ? "retry-daily" : "retry-session";
   return html(`
     <div class="results">
-      <div class="big">${emoticon}</div>
-      <div class="stars-big">${"★".repeat(r.stars)}${"☆".repeat(3 - r.stars)}</div>
-      <div class="score">${msg} ${r.correct}/${r.total} · ${r.pct}%</div>
-      <div class="streak-pill">🔥 ${profile().daily.streak} ${t("streakFlame")}</div>
+      <div class="big pop">${emoticon}</div>
+      <div class="stars-big">${[0, 1, 2].map((i) => `<span class="${i < r.stars ? "on" : ""}" style="animation-delay:${.25 + i * .22}s">${i < r.stars ? "★" : "☆"}</span>`).join("")}</div>
+      <div class="score">${msg}</div>
+      <div class="score-num">${r.correct}<span>/${r.total}</span> · ${r.pct}%</div>
+      ${r.levelUp ? `<div class="levelup">⬆️ ${tvar("levelUpTitle", { n: r.levelUp })}</div>` : ""}
+      <div class="xp-card">
+        <div class="xp-row"><span class="lv-pill">${t("level")} ${lv}</span><span class="xp-bar" data-xp-from="${pctFrom}" data-xp-to="${pctTo}"><i style="width:${pctFrom}%"></i></span><small class="xp-gain">${gained ? tvar("xpGained", { n: gained }) : ""}</small></div>
+      </div>
+      ${r.daily ? `<div class="streak-pill">🔥 ${p.daily.streak} ${t("streakFlame")}</div>` : ""}
+      ${rightHTML}
       ${wrongHTML}
       <div class="btn-row" style="margin-top:16px">
         <button class="btn btn-primary" data-action="${retryAction}">🔁 ${t("again")}</button>
@@ -1437,6 +1553,9 @@ function screenResults(params) {
     </div>`);
 }
 MOUNT.results = (params) => {
+  // animate the XP bar from where the session started to where it ended
+  const bar = APP.querySelector(".xp-bar[data-xp-to]");
+  if (bar) requestAnimationFrame(() => setTimeout(() => { bar.firstElementChild.style.width = bar.getAttribute("data-xp-to") + "%"; }, 600));
   bindAction(APP, "retry-session", () => { go("custom"); });
   bindAction(APP, "retry-daily", () => { const qs = buildDailyQuestions(); startSession({ title: t("daily"), questions: qs, clock: false, daily: true }); });
   bindAction(APP, "retry-wrong", () => {
