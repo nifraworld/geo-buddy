@@ -71,6 +71,8 @@ geo.nifraworld.com root
 ```
 
 ## Roadmap
+Ideas that are not scheduled live in `DREAM-BACKLOG.md`; releases are lifted from there into this list.
+
 - **Phase 0** Scaffold + data pipeline + generated assets. ✅
 - **Phase 1** Engine: welcome/who/home + explore + divisions/world map. ✅
 - **Phase 2** Quiz engine: modes, sessions, adaptive tracking, results, stars/streaks. ✅
