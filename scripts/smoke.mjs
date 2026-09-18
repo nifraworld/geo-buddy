@@ -60,6 +60,12 @@ Object.defineProperty(globalThis, "location", { value: { protocol: "http:" }, co
 globalThis.devicePixelRatio = 1;
 globalThis.confirm = () => true;
 
+// the world map globals (classic script in the browser) — evaluated the same way here
+{
+  const fs = await import("node:fs");
+  const src = fs.readFileSync(new URL("../assets/world-map-data.js", import.meta.url), "utf8");
+  new Function(src.replace(/\bvar (WORLD_\w+) =/g, "globalThis.$1 ="))();
+}
 const mod = await import("file:///D:/GeoBuddy/geo-data.js");
 const engSrc = await import("file:///D:/GeoBuddy/src/engine.js");
 const T = engSrc.__test;
@@ -207,6 +213,13 @@ assert(T.APP_LOCKED === false, "app starts unlocked");
   assert(rivers.length > 100 && rivers.some((r) => /Brahmaputra|Ganges|Nile|Amazon/.test(r.n)), "rivers layer has the big ones");
   assert(lakes.length >= 10, "lakes layer present");
   assert(text.some((x) => x.en === "Bay of Bengal" && x.bn) && text.filter((x) => x.kind === "continent").length === 7, "ocean + 7 continent labels, bilingual");
+}
+// v2.1: silhouette + continent questions
+{
+  const sh = T.countryQuestions("wsh"), wr = T.countryQuestions("wr");
+  assert(sh.length > 100 && sh.length < 194 && sh.every((q) => q.kind === "shape" && q.shapeId === q.answerId && q.choices.length === 4), "wsh: shapes only for countries big enough, 4 choices");
+  assert(wr.length === 194 && wr.every((q) => q.choices.length === 4 && q.choices.some((c) => c.id === q.answerId) && q.itemId && q.answerLabel), "wr: every country, region choices, answerLabel set");
+  assert(wr.every((q) => { const c = GEO.countries.find((x) => x.id === q.itemId); return c.region.toLowerCase() === q.answerId; }), "wr: answer is the country's own region");
 }
 // v2.1: territories & full flag set
 assert(T.EXTRAS.length >= 50 && T.EXTRAS.every((x) => x.id.startsWith("x-") && x.flagCode && x.en && x.bn && x.region), "extras present with flags");

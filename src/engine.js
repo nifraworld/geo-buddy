@@ -123,7 +123,7 @@ const L = {
       "d-div": "Division → District", "div-d": "District → Division", "d-find": "Find district on map",
       "wf": "Flag → Country", "wc": "Country → Flag", "wh": "Country → Capital", "hc": "Capital → Country",
       "world-find": "Find country on map", "wn": "Neighbours", "wb": "Which is bigger?", "wt": "Type the country",
-      "bd-type": "Type the division",
+      "bd-type": "Type the division", "wsh": "Guess the shape", "wr": "Which continent?",
     },
     qprompts: {
       "bd-hq": "Which division has the headquarters in {X}?",
@@ -138,6 +138,8 @@ const L = {
       "wb": "Which country is bigger?",
       "wt": "Type the name of this country",
       "bd-type": "Type the division whose headquarters is {X}",
+      "wsh": "Which country has this shape?",
+      "wr": "Which continent is {X} in?",
     },
     typeHere: "Type your answer…", check: "Check", showMe: "Show me",
     learn: "Learn", learnSub: "Flip cards first, then quiz yourself", learnPick: "What do you want to learn?",
@@ -249,7 +251,7 @@ const L = {
       "bd-hq": "সদর দপ্তর থেকে বিভাগ", "bd-fact": "তথ্য থেকে বিভাগ", "bd-find": "মানচিত্রে বিভাগ খুঁজো",
       "d-div": "বিভাগ → জেলা", "div-d": "জেলা → বিভাগ", "d-find": "মানচিত্রে জেলা খুঁজো",
       "wf": "পতাকা → দেশ", "wc": "দেশ → পতাকা", "wh": "দেশ → রাজধানী", "hc": "রাজধানী → দেশ",
-      "world-find": "মানচিত্রে দেশ খুঁজো", "wn": "প্রতিবেশী", "wb": "কোনটি বড়?", "wt": "দেশের নাম লেখো",
+      "world-find": "মানচিত্রে দেশ খুঁজো", "wn": "প্রতিবেশী", "wb": "কোনটি বড়?", "wt": "দেশের নাম লেখো", "wsh": "আকার দেখে বলো", "wr": "কোন মহাদেশে?",
       "bd-type": "বিভাগের নাম লেখো",
     },
     qprompts: {
@@ -264,6 +266,8 @@ const L = {
       "wn": "{X}-এর সাথে কোন দেশের সীমান্ত আছে?",
       "wb": "কোন দেশটি বড়?",
       "wt": "এই দেশের নাম লেখো",
+      "wsh": "এই আকারটি কোন দেশের?",
+      "wr": "{X} কোন মহাদেশে?",
       "bd-type": "যে বিভাগের সদর দপ্তর {X}, তার নাম লেখো",
     },
     typeHere: "উত্তর লেখো…", check: "যাচাই", showMe: "দেখাও",
@@ -1305,9 +1309,9 @@ MOUNT.play = (p) => {};
 
 /* ---------- custom quiz setup ---------- */
 let SETUP = { scope: "bd", types: [], count: 10, adaptive: false };
-const ALL_TYPES = ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d-find", "wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt"];
+const ALL_TYPES = ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d-find", "wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt", "wsh", "wr"];
 const BD_TYPES = ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d-find"];
-const WORLD_TYPES = ["wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt"];
+const WORLD_TYPES = ["wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt", "wsh", "wr"];
 function screenCustom() {
   const scope = SETUP.scope;
   const shown = scope === "bd" ? BD_TYPES
@@ -1414,7 +1418,7 @@ function deckFor(kind, key) {
   }
   const reg = REGIONS.find((r) => r.id === key) || REGIONS[0];
   const cs = CTRY.filter((c) => c.region === reg.en);
-  return { title: tvar("deckRegion", { X: _lang === "bn" ? reg.bn : reg.en }), scope: "world", types: ["wf", "wh", "hc", "world-find", "wt"],
+  return { title: tvar("deckRegion", { X: _lang === "bn" ? reg.bn : reg.en }), scope: "world", types: ["wf", "wh", "hc", "world-find", "wt", "wsh"],
     items: cs.map((c) => ({ id: c.id, ent: "c", name: cname(c), speak: _lang === "bn" ? c.bn : c.en, flag: c.flagCode,
       sub: `${t("capital")}: ${cap(c)}`,
       back: [[t("capital"), cap(c)], [t("region"), regionBn(c.region)], [t("pop"), c.population ? fmtPop(c.population) : "—"], [t("area"), fmtNum(c.area) + " km²"]],
@@ -1581,7 +1585,7 @@ function buildQuestionList({ scope, types, count, adaptive, items }) {
     for (const ty of ["d-div", "div-d", "d-find"]) if (types.includes(ty)) pool.push(...distQuestions(ty));
   }
   if (scope === "world" || scope === "both") {
-    for (const ty of ["wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt"]) if (types.includes(ty)) pool.push(...countryQuestions(ty));
+    for (const ty of ["wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt", "wsh", "wr"]) if (types.includes(ty)) pool.push(...countryQuestions(ty));
   }
   if (items) pool = pool.filter((q) => items.has(String(q.itemId || q.answerId)));
   if (!pool.length) return [];
@@ -1675,6 +1679,19 @@ function countryQuestions(ty) {
     if (ty === "wt") { // flag → type the country
       return { type: "wt", kind: "type", flagCode: c.flagCode, answerId: c.id, prompt: t("qprompts.wt"),
         accept: [c.en, c.bn, c.official].filter(Boolean), answerLabel: cname(c) };
+    }
+    if (ty === "wsh") { // silhouette → country (only shapes big enough to recognise)
+      if (!WORLD_MAP[c.id] || WORLD_DOTS[c.id]) return null;
+      // distractors of a comparable size (within 8×) so "Brazil or Grenada?" never happens
+      const peers = CTRY.filter((x) => x.id === c.id || (x.area && c.area && x.area / c.area < 8 && c.area / x.area < 8));
+      return { type: "wsh", kind: "shape", shapeId: c.id, answerId: c.id, prompt: t("qprompts.wsh"), choices: fillChoices(peers.length >= 4 ? peers : CTRY, c, (x) => cname(x), { regionBias: true }) };
+    }
+    if (ty === "wr") { // country → continent/region; choices are regions, answer keyed by region id
+      const reg = REGIONS.find((r) => r.id === c.region.toLowerCase());
+      if (!reg) return null;
+      const others = shuffle(REGIONS.filter((r) => r.id !== reg.id)).slice(0, 3);
+      return { type: "wr", kind: "text", answerId: reg.id, itemId: c.id, answerLabel: _lang === "bn" ? reg.bn : reg.en, prompt: tvar("qprompts.wr", { X: cname(c) }),
+        choices: shuffle([reg, ...others]).map((r) => ({ id: r.id, label: _lang === "bn" ? r.bn : r.en })) };
     }
     return null;
   }).filter(Boolean);
@@ -1792,12 +1809,15 @@ MOUNT.session = function (conf) {
       inner = flagQuestionHTML(s, q, n);
     } else if (q.kind === "type") {
       inner = typeQuestionHTML(s, q, n);
+    } else if (q.kind === "shape") {
+      inner = shapeQuestionHTML(s, q, n);
     } else {
       inner = textQuestionHTML(s, q, n);
     }
     let rootEl = APP.querySelector("#q-root");
     if (!rootEl) { rootEl = document.createElement("div"); rootEl.id = "q-root"; APP.appendChild(rootEl); }
     rootEl.innerHTML = inner;
+    if (q.kind === "shape") drawShape(rootEl.querySelector("[data-shape]"), q.shapeId);
     if (q.kind === "map") mountMapQuestion(s, q);
     else if (q.kind === "type") mountTypeQuestion(s, q);
     else mountChoiceQuestion(s, q);
@@ -1837,6 +1857,38 @@ function textQuestionHTML(s, q, n) {
     <div class="choices">
       ${q.choices.map((c, i) => `<button class="choice" data-choice="${c.id}"><span class="ltr">${"ABCD"[i]}</span><span class="nm">${c.label}</span></button>`).join("")}
     </div>`;
+}
+/* v2.1: silhouette question — the country's own map path, mainland-framed,
+   filled in the brand colour on a plain card */
+function shapeQuestionHTML(s, q, n) {
+  return `
+    ${qHead(s)}${qBar(s)}
+    <div class="q-prompt">${q.prompt}</div>
+    <canvas class="q-shape" data-shape width="600" height="400"></canvas>
+    <div class="choices">
+      ${q.choices.map((c, i) => `<button class="choice" data-choice="${c.id}"><span class="ltr">${"ABCD"[i]}</span><span class="nm">${c.label}</span></button>`).join("")}
+    </div>`;
+}
+function drawShape(canvas, id) {
+  if (!canvas) return;
+  const md = makeMapModel("world");
+  const en = md.byId[String(id)];
+  if (!en) return;
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  // frame the mainland box (France without Guiana); islands outside it are simply clipped
+  // en.main is in canvas space (shifted down by md.oy); the path itself is not
+  const b = [en.main[0], en.main[1] - md.oy, en.main[2], en.main[3] - md.oy];
+  const bw = Math.max(1, b[2] - b[0]), bh = Math.max(1, b[3] - b[1]);
+  const k = Math.min((W * 0.8) / bw, (H * 0.8) / bh);
+  const tx = W / 2 - (b[0] + bw / 2) * k, ty = H / 2 - (b[1] + bh / 2) * k;
+  ctx.setTransform(k, 0, 0, k, tx, ty);
+  ctx.fillStyle = isDark() ? "#5E9B6E" : "#2FA56A";
+  ctx.fill(en.path);
+  ctx.strokeStyle = isDark() ? "#0F1D18" : "#0E3B2E";
+  ctx.lineWidth = 2 / k; ctx.lineJoin = "round";
+  ctx.stroke(en.path);
 }
 function flagQuestionHTML(s, q, n) {
   const prompt = q.prompt ? `<div class="q-prompt">${q.prompt}</div>` : "";
@@ -2107,7 +2159,7 @@ function screenResults(params) {
           correctName = cname(ctryIdx[correctId]);
         }
         const lbl = q.answerLabel || (q.choices ? (q.choices.find((c) => c.id === correctId) || { label: correctName }).label : correctName);
-        const icon = q.kind === "map" ? "📍 " : q.kind === "flag" ? `🏳️ ` : q.flagCode ? "❤️ " : "💬 ";
+        const icon = q.kind === "map" ? "📍 " : q.kind === "flag" ? `🏳️ ` : q.kind === "shape" ? "🧩 " : q.flagCode ? "❤️ " : "💬 ";
         return `<li style="margin:6px 0"><span class="qw">${q.prompt.replace(/^❓\s*/, "").slice(0, 70)}</span><br><span class="qa">✅ ${icon}${lbl}</span></li>`;
       }).join("")}</ul>
       <button class="btn btn-paper btn-small" data-action="retry-wrong" style="margin-top:10px">${t("tryAgainBtn")}</button>
@@ -3084,4 +3136,4 @@ function boot() {
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { EXTRAS, mascot, journeyNodes, nodeStars, childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };
+export const __test = { drawShape, makeMapModel, EXTRAS, mascot, journeyNodes, nodeStars, childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };
