@@ -9,6 +9,7 @@
     "maps": "node scripts/maps.mjs",
     "flags": "node scripts/flags.mjs",
     "photos": "node scripts/photos.mjs",
+    "photos:wd": "node scripts/photos-wikidata.mjs",
     "data": "node scripts/build-data.mjs",
     "icons": "node scripts/icons.mjs",
     "build": "node scripts/build.mjs",

@@ -30,6 +30,10 @@ const upazilaCount = (en) => upazilaByDistrict[String(en).toLowerCase().replace(
 const photos = exists(".cache/photos.json")
   ? JSON.parse(read(".cache/photos.json"))
   : {};
+// v2.1: Wikidata P18 photos (scripts/photos-wikidata.mjs); slimmed to what the app shows
+const photosWorld = exists(".cache/photos-world.json") ? JSON.parse(read(".cache/photos-world.json")) : {};
+const photosDist = exists(".cache/photos-districts.json") ? JSON.parse(read(".cache/photos-districts.json")) : {};
+const slimPhoto = (ph) => ph ? { url: ph.url, page: ph.page, artist: ph.artist, license: ph.license, file: ph.file } : null;
 const populations = exists(".cache/populations.json")
   ? JSON.parse(read(".cache/populations.json"))
   : [];
@@ -108,6 +112,8 @@ const unMembers = countries
       dial: c.idd && c.idd.root ? c.idd.root + ((c.idd.suffixes || []).length === 1 ? c.idd.suffixes[0] : "") : "",
       demonym: (c.demonyms && c.demonyms.eng && c.demonyms.eng.m) || "",
       tld: (c.tld && c.tld[0]) || "",
+      // the capital's photo first (a skyline reads as "a place"), else the country's
+      photo: slimPhoto(photosWorld["cap:" + id] || photosWorld["c:" + id]),
     };
   });
 
@@ -139,6 +145,7 @@ const divisions = DIVISIONS.map((d) => ({
 
 const districts = DISTRICTS.map((d) => ({
   ...d,
+  photo: slimPhoto(photosDist[d.id]),
   upazilas: upazilaCount(d.en) || 0,
   density: Math.round(d.pop / d.areaKm2),
 }));

@@ -1105,6 +1105,15 @@ function divColor(id) {
 }
 
 /* ---------- detail ---------- */
+/* photo (online only, lazy) + placeholder; credit line goes in the card */
+function photoBlock(ph, alt) {
+  return ph && navigator.onLine
+    ? `<img class="detail-photo" loading="lazy" src="${ph.url}" alt="${alt}" onerror="this.remove()">`
+    : `<div class="photo-ph">${ph ? t("off") + " · " + ph.file : ""}${!ph ? "🖼️" : ""}</div>`;
+}
+function photoCredit(ph) {
+  return ph ? `<p class="attr">${tvar("photoCredits", { a: ph.artist })} · <a href="${ph.page}" rel="noopener" target="_blank">${ph.license || "CC"}</a></p>` : "";
+}
 function screenDetail(params) {
   const { kind, id } = params;
   const p = profile();
@@ -1148,6 +1157,7 @@ function screenDetail(params) {
         <span class="stars">${"★".repeat(stN)}${"☆".repeat(3 - stN)}</span>
         <div class="official-txt">${t("district")} · ${name(div)}</div>
       </div>
+      ${photoBlock(d.photo, dname(d))}
       <div class="btn-row">
         <button class="btn btn-paper btn-small" data-action="listen"><span class="icon-txt">🔊</span> ${t("listen")}</button>
         <button class="btn btn-paper btn-small ${favH ? "fav-on" : ""}" data-action="fav"><span class="icon-txt">${favH ? "⭐" : "☆"}</span> ${t("favorite")}</button>
@@ -1160,6 +1170,7 @@ function screenDetail(params) {
           <div class="stat"><b>${fmtNum(d.density)}/km²</b><small>${t("density")}</small></div>
         </div>
         <div class="factbox">${tvar("districtPractise", { d: dname(d), dv: name(div) })}</div>
+        ${photoCredit(d.photo)}
       </div>
       <div class="btn-row"><button class="btn btn-primary" data-nav="play">▶ ${t("play")}</button></div>
       ${reportLink()}`);
@@ -1180,6 +1191,7 @@ function screenDetail(params) {
       ${nativeTxt ? `<div class="native-txt">${nativeTxt}</div>` : ""}
     </div>
     <img class="q-flag" src="${flagUrl(c.flagCode)}" alt="${cname(c)}" onerror="this.remove()">
+    ${c.photo ? photoBlock(c.photo, cname(c)) : ""}
     <div class="btn-row">
       <button class="btn btn-paper btn-small" data-action="listen"><span class="icon-txt">🔊</span> ${t("listen")}</button>
       <button class="btn btn-paper btn-small ${favH ? "fav-on" : ""}" data-action="fav"><span class="icon-txt">${favH ? "⭐" : "☆"}</span> ${t("favorite")}</button>
@@ -1195,6 +1207,7 @@ function screenDetail(params) {
       ${factRows(c)}
       <h3>${t("neighbors")}</h3>
       <div class="chips">${neigh}</div>
+      ${photoCredit(c.photo)}
     </div>
     <div class="btn-row"><button class="btn btn-primary" data-nav="play">▶ ${t("play")}</button></div>
     ${reportLink()}`);
