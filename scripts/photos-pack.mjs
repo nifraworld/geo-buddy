@@ -34,6 +34,9 @@ for (const id of countryIds) {
   if (ph) jobs.push(["c-" + id, ph.file]);
 }
 
+const landmarks = read("landmarks.json");          // { eiffel: {photo,…} }
+for (const [id, r] of Object.entries(landmarks)) if (r && r.photo) jobs.push(["l-" + id, r.photo.file]);
+
 const manifest = {};
 let made = 0, kept = 0, failed = 0;
 for (const [key, file] of jobs) {

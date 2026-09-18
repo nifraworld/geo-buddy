@@ -214,6 +214,22 @@ assert(T.APP_LOCKED === false, "app starts unlocked");
   assert(lakes.length >= 10, "lakes layer present");
   assert(text.some((x) => x.en === "Bay of Bengal" && x.bn) && text.filter((x) => x.kind === "continent").length === 7, "ocean + 7 continent labels, bilingual");
 }
+// v2.3: landmarks
+{
+  const L = T.LANDMARKS;
+  assert(L.length === 118 && L.filter((l) => l.scope === "bd").length === 18, "118 landmarks, 18 in Bangladesh");
+  assert(L.every((l) => l.en && l.bn && l.factEn && l.factBn && l.photo && l.px && Number.isFinite(l.lat)), "every landmark has names, facts, photo, coords, pin");
+  assert(L.filter((l) => l.scope === "world").every((l) => GEO.countries.some((c) => c.id === l.country)), "world landmarks map to a UN country");
+  assert(L.filter((l) => l.scope === "bd").every((l) => GEO.districts.some((d) => d.id === l.dist) && GEO.divisions.some((d) => d.id === l.div)), "BD landmarks map to a district + division");
+  assert(L.filter((l) => l.scope === "bd").every((l) => l.px[0] > 0 && l.px[0] < 640 && l.px[1] > 0 && l.px[1] < 840), "BD pins inside the 640×840 map");
+  assert(L.filter((l) => l.scope === "world").every((l) => l.px[0] > 0 && l.px[0] < 900 && l.px[1] > 0 && l.px[1] < 460), "world pins inside the 900×460 map");
+  assert(T.lmPlace(L.find((l) => l.id === "eiffel")) === "France" && /Dhaka/.test(T.lmPlace(L.find((l) => l.id === "lalbagh"))), "lmPlace: country / district · division");
+  const lc = T.landmarkQuestions("lm-c", "world"), ln = T.landmarkQuestions("lm-name", "bd"), lf = T.landmarkQuestions("lm-find", "world"), ld = T.landmarkQuestions("lm-div", "bd");
+  assert(lc.length === 100 && lc.every((q) => q.kind === "photo" && q.photo && q.choices.length === 4 && q.choices.some((c) => c.id === q.answerId) && q.lmId), "lm-c: 100 photo questions with the right country among 4");
+  assert(ln.length === 18 && ln.every((q) => q.choices.length === 4 && q.answerId === q.lmId), "lm-name: BD landmarks, answer is the landmark itself");
+  assert(lf.length === 100 && lf.every((q) => q.kind === "map" && q.map === "world" && q.photo), "lm-find: map questions carry the photo");
+  assert(ld.length === 18 && ld.every((q) => GEO.divisions.some((d) => d.id === q.answerId)), "lm-div: answer is a division");
+}
 // v2.2: offline packs
 assert(T.photoSrc({ url: "https://x/y.jpg" }, "c-050") === "https://x/y.jpg", "photoSrc: remote url when no pack and online");
 assert(T.photoSrc(null, "c-050") === "", "photoSrc: nothing without a photo");
@@ -241,7 +257,7 @@ assert(!GEO.countries.some((c) => c.id.startsWith("x-")), "extras never leak int
 // v2.0: mascot + journey
 for (const m of ["happy", "wow", "sad", "think", "sleepy"]) assert(T.mascot(m, 40).startsWith("<svg") && T.mascot(m, 40).includes('width="40"'), "mascot " + m + " renders svg");
 const jn = T.journeyNodes();
-assert(jn.length === 1 + 8 + 5 && jn[0].id === "div:" && jn.every((n) => n.label && !looksRaw(n.label)), "journey: divisions + 8 district decks + 5 regions, human labels");
+assert(jn.length === 1 + 8 + 5 + 2 && jn[0].id === "div:" && jn[jn.length - 1].id === "lm:world" && jn.every((n) => n.label && !looksRaw(n.label)), "journey: divisions + 8 district decks + 5 regions + 2 landmark stops, human labels");
 assert(T.nodeStars({}, "div:") === 0 && T.nodeStars({ journey: { "div:": 49 } }, "div:") === 0, "journey: <50% no star");
 assert(T.nodeStars({ journey: { "div:": 50 } }, "div:") === 1 && T.nodeStars({ journey: { "div:": 70 } }, "div:") === 2 && T.nodeStars({ journey: { "div:": 90 } }, "div:") === 3, "journey: 50/70/90 -> 1/2/3 stars");
 const xpP = { stats: { correct: 3 }, bonusXP: 5 };

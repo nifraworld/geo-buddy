@@ -287,11 +287,35 @@ Ideas that are not scheduled live in `DREAM-BACKLOG.md`; releases are lifted fro
   - **Bagha talks**: tap the mascot on Home → hop animation + the tip read aloud.
   - Photo pack is git-tracked (Cloudflare Pages serves it); not in the SW precache, so
     the base install stays ≈ 3 MB.
+- **V2.3** "Landmarks". ✅
+  - **118 landmarks** — 100 world (Taj Mahal, Great Wall, Eiffel, Petra, Machu Picchu,
+    Uluru…) + 18 Bangladesh (Sundarbans, Cox's Bazar, Sixty Dome Mosque, Paharpur,
+    Lalbagh, Shaheed Minar, Sangsad Bhaban, Sajek…). Curated in
+    `scripts/landmarks-list.mjs` with EN + BN names and a one-sentence fact in both
+    languages, written for a child. `scripts/landmarks.mjs` resolves each on Wikidata
+    (item → coordinates → P18 photo; candidates must have coordinates inside their own
+    country — "Petra" alone found a street in Hamburg), Commons for credits; no-people
+    policy as before; four photos hand-picked. `npm run landmarks`.
+  - **Explore → 🏛️ Landmarks** tab with photo thumbnails, filters All / Bangladesh /
+    World / Building / Nature / Ancient; **detail page**: photo, fact, tappable chips to
+    the country or district + division, Listen, Favourite, ▶ quiz.
+  - **Learn decks** "Bangladesh landmarks" and "World landmarks" (photo cards, place on
+    the back); two new **Journey** stops at the end of the path.
+  - **Four question types**: *Landmark → Country* (`lm-c`), *Landmark → Division*
+    (`lm-div`, BD), *Name the landmark* (`lm-name`), *Where is this photo?* (`lm-find`,
+    photo above the map, tap the country / division). A landmark is only asked when its
+    photo can load (online, or from the picture pack) so quizzes never show a blank.
+  - **Pins on the Bangladesh maps** (explorer): 🏛️ 🌿 🏺 markers at the real
+    coordinates; tap → landmark page; clustered pins collapse at low zoom; division
+    labels dodge the pins. Coordinates pre-projected at build with the parameters the
+    map builder now exports (`BD_PROJ`, `WORLD_PROJ`).
+  - Picture pack grows to 378 files / 6.2 MB (landmarks included).
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.
 - World map, rivers, lakes: Natural Earth 1:50m / 1:10m (public domain).
-- Country / capital / district photos: Wikidata (CC0) → Wikimedia Commons (per-file licence, credited in-app).
+- Country / capital / district / landmark photos: Wikidata (CC0) → Wikimedia Commons (per-file licence, credited in-app).
+- Landmark coordinates: Wikidata (CC0). Landmark facts: written by us.
 - Flag artwork: `lipis/flag-icons` (MIT) — flags redrawn from SVG, cached offline.
 - Divisions map: public administrative boundary data (GeoJSON) — simplified to SVG.
 - Division photos: Wikimedia Commons (CC BY/CC BY-SA) — links + attribution shown.

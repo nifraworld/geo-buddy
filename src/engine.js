@@ -10,6 +10,16 @@ const CTRY = GEO.countries; // 194 countries
 const REGIONS = GEO.regions; // 5 regions
 const DISTS = GEO.districts; // 64 districts
 const EXTRAS = GEO.extras || []; // v2.1: territories & non-UN places (Explore only)
+const LANDMARKS = GEO.landmarks || []; // v2.3: 100 world + 18 Bangladesh landmarks
+const lmIdx = Object.fromEntries(LANDMARKS.map((l) => [l.id, l]));
+const lname = (l) => (_lang === "bn" ? l.bn : l.en);
+const lfact = (l) => (_lang === "bn" ? l.factBn : l.factEn);
+/* where a landmark is, as a child would say it: country (world) or district · division (BD) */
+function lmPlace(l) {
+  if (l.scope === "world") { const c = ctryIdx[l.country]; return c ? cname(c) : ""; }
+  const d = distIdx[l.dist], dv = divIdx[l.div];
+  return [d && dname(d), dv && name(dv)].filter(Boolean).join(" · ");
+}
 const NATIONAL = GEO.national;
 
 const BD_MAP = window.BD_MAP || {};
@@ -107,6 +117,9 @@ const L = {
     extrasChip: "Territories & others", extrasNote: "{n} places that are not UN member countries — islands, territories and special regions. Just for exploring; they never come up in quizzes.",
     extraTerritory: "Territory or dependency", extraIndependent: "Independent, not a UN member", partOf: "Region",
     currency: "Money", languages: "Languages", dial: "Phone code", demonym: "People are called", tld: "Web address", moreFacts: "More facts",
+    landmarks: "Landmarks", lmSub: "Famous places of Bangladesh and the world", lmWorld: "World", lmBD: "Bangladesh",
+    lmKind_built: "Building", lmKind_natural: "Nature", lmKind_ancient: "Ancient",
+    deckLandmarksWorld: "World landmarks", deckLandmarksBD: "Bangladesh landmarks", whereIs: "Where is it?",
     packsTitle: "Offline packs", packsSub: "Optional downloads so pictures and voices work without internet",
     packPhotos: "Pictures", packPhotosSub: "A photo for every country and district", packAudio: "Bangla voice", packAudioSub: "Real spoken names instead of the phone's robot voice",
     packGet: "Download", packRemove: "Remove", packDone: "Downloaded", packBusy: "{n} of {total}…", packNeedNet: "Connect to the internet to download", packNotReady: "Coming soon", packFail: "Download stopped — try again",
@@ -128,6 +141,7 @@ const L = {
       "wf": "Flag → Country", "wc": "Country → Flag", "wh": "Country → Capital", "hc": "Capital → Country",
       "world-find": "Find country on map", "wn": "Neighbours", "wb": "Which is bigger?", "wt": "Type the country",
       "bd-type": "Type the division", "wsh": "Guess the shape", "wr": "Which continent?",
+      "lm-c": "Landmark → Country", "lm-name": "Name the landmark", "lm-find": "Where is this photo?", "lm-div": "Landmark → Division",
     },
     qprompts: {
       "bd-hq": "Which division has the headquarters in {X}?",
@@ -144,6 +158,10 @@ const L = {
       "bd-type": "Type the division whose headquarters is {X}",
       "wsh": "Which country has this shape?",
       "wr": "Which continent is {X} in?",
+      "lm-c": "Which country is this landmark in?",
+      "lm-name": "What is this place called?",
+      "lm-find": "Where is this photo? Tap the map",
+      "lm-div": "Which division is this landmark in?",
     },
     typeHere: "Type your answer…", check: "Check", showMe: "Show me",
     learn: "Learn", learnSub: "Flip cards first, then quiz yourself", learnPick: "What do you want to learn?",
@@ -239,6 +257,9 @@ const L = {
     extrasChip: "অঞ্চল ও অন্যান্য", extrasNote: "{n}টি জায়গা যারা জাতিসংঘের সদস্য দেশ নয় — দ্বীপ, অঞ্চল ও বিশেষ এলাকা। শুধু ঘুরে দেখার জন্য; কুইজে আসবে না।",
     extraTerritory: "অঞ্চল বা অধীনস্থ এলাকা", extraIndependent: "স্বাধীন, জাতিসংঘের সদস্য নয়", partOf: "অঞ্চল",
     currency: "মুদ্রা", languages: "ভাষা", dial: "ফোন কোড", demonym: "মানুষকে বলা হয়", tld: "ওয়েব ঠিকানা", moreFacts: "আরও তথ্য",
+    landmarks: "দর্শনীয় স্থান", lmSub: "বাংলাদেশ ও বিশ্বের বিখ্যাত জায়গা", lmWorld: "বিশ্ব", lmBD: "বাংলাদেশ",
+    lmKind_built: "স্থাপনা", lmKind_natural: "প্রকৃতি", lmKind_ancient: "প্রাচীন",
+    deckLandmarksWorld: "বিশ্বের দর্শনীয় স্থান", deckLandmarksBD: "বাংলাদেশের দর্শনীয় স্থান", whereIs: "কোথায়?",
     packsTitle: "অফলাইন প্যাক", packsSub: "ইন্টারনেট ছাড়াও ছবি ও কণ্ঠ কাজ করার জন্য ঐচ্ছিক ডাউনলোড",
     packPhotos: "ছবি", packPhotosSub: "প্রতিটি দেশ ও জেলার একটি ছবি", packAudio: "বাংলা কণ্ঠ", packAudioSub: "ফোনের যান্ত্রিক কণ্ঠের বদলে আসল উচ্চারণ",
     packGet: "ডাউনলোড", packRemove: "সরাও", packDone: "ডাউনলোড হয়েছে", packBusy: "{total}টির মধ্যে {n}…", packNeedNet: "ডাউনলোডের জন্য ইন্টারনেটে যুক্ত হোন", packNotReady: "শিগগিরই আসছে", packFail: "ডাউনলোড থেমে গেছে — আবার চেষ্টা করুন",
@@ -258,7 +279,7 @@ const L = {
       "bd-hq": "সদর দপ্তর থেকে বিভাগ", "bd-fact": "তথ্য থেকে বিভাগ", "bd-find": "মানচিত্রে বিভাগ খুঁজো",
       "d-div": "বিভাগ → জেলা", "div-d": "জেলা → বিভাগ", "d-find": "মানচিত্রে জেলা খুঁজো",
       "wf": "পতাকা → দেশ", "wc": "দেশ → পতাকা", "wh": "দেশ → রাজধানী", "hc": "রাজধানী → দেশ",
-      "world-find": "মানচিত্রে দেশ খুঁজো", "wn": "প্রতিবেশী", "wb": "কোনটি বড়?", "wt": "দেশের নাম লেখো", "wsh": "আকার দেখে বলো", "wr": "কোন মহাদেশে?",
+      "world-find": "মানচিত্রে দেশ খুঁজো", "wn": "প্রতিবেশী", "wb": "কোনটি বড়?", "wt": "দেশের নাম লেখো", "wsh": "আকার দেখে বলো", "wr": "কোন মহাদেশে?", "lm-c": "দর্শনীয় স্থান → দেশ", "lm-name": "জায়গার নাম বলো", "lm-find": "ছবিটি কোথায়?", "lm-div": "দর্শনীয় স্থান → বিভাগ",
       "bd-type": "বিভাগের নাম লেখো",
     },
     qprompts: {
@@ -275,6 +296,10 @@ const L = {
       "wt": "এই দেশের নাম লেখো",
       "wsh": "এই আকারটি কোন দেশের?",
       "wr": "{X} কোন মহাদেশে?",
+      "lm-c": "এই দর্শনীয় স্থানটি কোন দেশে?",
+      "lm-name": "এই জায়গার নাম কী?",
+      "lm-find": "এই ছবিটি কোথায়? মানচিত্রে স্পর্শ করো",
+      "lm-div": "এই দর্শনীয় স্থানটি কোন বিভাগে?",
       "bd-type": "যে বিভাগের সদর দপ্তর {X}, তার নাম লেখো",
     },
     typeHere: "উত্তর লেখো…", check: "যাচাই", showMe: "দেখাও",
@@ -1096,12 +1121,15 @@ function screenExplore(params = {}) {
     <div class="tabs">
       <button class="tab ${scope === "bd" ? "on" : ""}" data-action="explore-scope" data-scope="bd">${t("sectionBD")}</button>
       <button class="tab ${scope === "world" ? "on" : ""}" data-action="explore-scope" data-scope="world">${t("sectionWorld")}</button>
+      <button class="tab ${scope === "lm" ? "on" : ""}" data-action="explore-scope" data-scope="lm">🏛️ ${t("landmarks")}</button>
     </div>
     ${bdLevel}
     <input class="search" data-q value="${q}" placeholder="${t("search")}">
     <div class="filter-row">
       <button class="fchip ${favF ? "on" : ""}" data-action="explore-fav" data-fav="1">⭐ ${t("favorites")}</button>
-      ${scope === "world"
+      ${scope === "lm"
+        ? ["all", "bd", "world", "built", "natural", "ancient"].map((k) => `<button class="fchip ${regionF === k ? "on" : ""}" data-action="explore-region" data-region="${k}">${k === "all" ? t("regionAll") : k === "bd" ? "🇧🇩 " + t("lmBD") : k === "world" ? "🌍 " + t("lmWorld") : t("lmKind_" + k)}</button>`).join("")
+        : scope === "world"
         ? `<button class="fchip ${regionF === "all" ? "on" : ""}" data-action="explore-region" data-region="all">${t("regionAll")}</button>
            ${REGIONS.map((r) => `<button class="fchip ${regionF === r.id ? "on" : ""}" data-action="explore-region" data-region="${r.id}">${_lang === "bn" ? r.bn : r.en}</button>`).join("")}
            <button class="fchip ${regionF === "extras" ? "on" : ""}" data-action="explore-region" data-region="extras">🏝️ ${t("extrasChip")}</button>`
@@ -1132,6 +1160,12 @@ MOUNT.explore = (params = {}) => {
         key: "div|" + d.id, kind: "d", id: d.id, img: null, ring: avatarEmoji(d.id),
         nm: name(d), sb: `${d.districts} ${t("districts")} · ${t("hq")}: ${_lang === "bn" ? d.hqBn : d.hq}`, st: starShown(p, "d", d.id),
         open: () => go("detail", { kind: "div", id: d.id }),
+      }));
+    } else if (scope === "lm") {
+      items = LANDMARKS.filter((l) => regionF === "all" || l.scope === regionF || l.kind === regionF).map((l) => ({
+        key: "l|" + l.id, kind: "l", id: l.id, img: lmPhotoSrc(l) || null, ring: l.kind === "natural" ? "🌿" : l.kind === "ancient" ? "🏺" : "🏛️", photoRow: true,
+        nm: lname(l), sb: lmPlace(l), st: starShown(p, "l", l.id),
+        open: () => go("detail", { kind: "l", id: l.id }),
       }));
     } else if (regionF === "extras") {
       items = EXTRAS.map((x) => ({
@@ -1180,7 +1214,7 @@ MOUNT.explore = (params = {}) => {
       const fav = isFav(p, it.kind, it.id);
       return `
       <button class="item" data-kind="${it.key.split("|")[0]}">
-        ${it.img ? `<img class="flag" src="${it.img}" alt="" loading="lazy">` : `<span class="ring" style="background:${divColor(it.key.split("|")[1])}">${it.ring}</span>`}
+        ${it.img ? `<img class="${it.photoRow ? "thumb" : "flag"}" src="${it.img}" alt="" loading="lazy" onerror="this.outerHTML='<span class=ring style=background:var(--saffron-2)>${it.ring || "🏛️"}</span>'">` : `<span class="ring" style="background:${divColor(it.key.split("|")[1])}">${it.ring}</span>`}
         <span class="tx"><span class="nm">${it.nm}</span><br><span class="sb">${it.sb}</span></span>
         <span class="favbtn" data-fav role="button" aria-label="${t("favorite")}">${fav ? "⭐" : "☆"}</span>
         <span class="st">${it.st ? "★" : ""}</span>
@@ -1270,6 +1304,37 @@ function screenDetail(params) {
       <div class="btn-row"><button class="btn btn-primary" data-nav="play">▶ ${t("play")}</button></div>
       ${reportLink()}`);
   }
+  if (kind === "l") {
+    const l = lmIdx[id];
+    const stN = starShown(p, "l", id);
+    const favH = isFav(p, "l", id);
+    const c = l.scope === "world" ? ctryIdx[l.country] : null;
+    const dv = l.scope === "bd" ? divIdx[l.div] : null;
+    const dz = l.scope === "bd" ? distIdx[l.dist] : null;
+    return html(`
+      <div style="text-align:center;margin:6px 0">
+        <h1 style="color:var(--green)">${lname(l)}</h1>
+        <span class="stars">${"★".repeat(stN)}${"☆".repeat(3 - stN)}</span>
+        <div class="official-txt">${t("lmKind_" + l.kind)} · ${lmPlace(l)}</div>
+      </div>
+      ${photoBlock(l.photo, lname(l), "l-" + l.id)}
+      <div class="btn-row">
+        <button class="btn btn-paper btn-small" data-action="listen"><span class="icon-txt">🔊</span> ${t("listen")}</button>
+        <button class="btn btn-paper btn-small ${favH ? "fav-on" : ""}" data-action="fav"><span class="icon-txt">${favH ? "⭐" : "☆"}</span> ${t("favorite")}</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="factbox">${lfact(l)}</div>
+        <h3>${t("whereIs")}</h3>
+        <div class="chips">
+          ${c ? `<button class="chip" data-nav="detail" data-kind="c" data-id="${c.id}"><img class="chip-flag" src="${flagUrl(c.flagCode)}" alt="">${cname(c)}</button>` : ""}
+          ${dz ? `<button class="chip" data-nav="detail" data-kind="z" data-id="${dz.id}"><span class="sw" style="background:${DIV_PALETTE[dz.div]}"></span>${dname(dz)}</button>` : ""}
+          ${dv ? `<button class="chip" data-nav="detail" data-kind="div" data-id="${dv.id}"><span class="sw" style="background:${DIV_PALETTE[dv.id]}"></span>${name(dv)}</button>` : ""}
+        </div>
+        ${photoCredit(l.photo)}
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" data-action="lm-quiz">▶ ${t("play")}</button></div>
+      ${reportLink()}`);
+  }
   const c = ctryIdx[id];
   const stN = starShown(p, "c", id);
   const favH = isFav(p, "c", id);
@@ -1320,7 +1385,7 @@ function factRows(c) {
 }
 function reportLink() { return `<button class="report-link" data-action="report">⚠️ ${t("reportMistake")}</button>`; }
 function openReportModal(item, kind) {
-  const nm = kind === "c" ? cname(item) : kind === "z" ? dname(item) : name(item);
+  const nm = kind === "c" ? cname(item) : kind === "z" ? dname(item) : kind === "l" ? lname(item) : name(item);
   const dlg = html(`<div class="modal-bg"><div class="modal">
       <h3>⚠️ ${t("reportMistake")}</h3>
       <p class="ds" style="margin:6px 0 10px">${nm}</p>
@@ -1351,8 +1416,16 @@ function openReportModal(item, kind) {
 }
 MOUNT.detail = (params) => {
   const p = profile();
-  const item = params.kind === "div" ? divIdx[params.id] : params.kind === "z" ? distIdx[params.id] : ctryIdx[params.id];
-  const favT = params.kind === "div" ? "d" : params.kind === "z" ? "z" : "c";
+  const item = params.kind === "div" ? divIdx[params.id] : params.kind === "z" ? distIdx[params.id] : params.kind === "l" ? lmIdx[params.id] : ctryIdx[params.id];
+  const favT = params.kind === "div" ? "d" : params.kind === "z" ? "z" : params.kind === "l" ? "l" : "c";
+  APP.querySelectorAll("[data-nav=detail]").forEach((b) => b.addEventListener("click", () => go("detail", { kind: b.getAttribute("data-kind"), id: b.getAttribute("data-id") })));
+  bindAction(APP, "lm-quiz", () => {
+    const l = item;
+    const deck = deckFor("lm", l.scope);
+    if (!scopeAllowed(deck.scope)) return;
+    const qs = buildQuestionList({ scope: deck.scope, types: deck.types, count: 8, adaptive: true, items: new Set(deck.items.map((x) => String(x.id))) });
+    if (qs.length) startSession({ title: deck.title, questions: qs, clock: false, daily: false, nodeId: "lm:" + l.scope });
+  });
   bindAction(APP, "listen", (e, btn) => {
     _lang === "bn" ? speak(item.bn, _lang) : speak(item.en, _lang);
   });
@@ -1360,7 +1433,7 @@ MOUNT.detail = (params) => {
     const v = toggleFav(profile(), favT, params.id);
     btn.classList.toggle("fav-on", v);
     btn.innerHTML = `<span class="icon-txt">${v ? "⭐" : "☆"}</span> ${t("favorite")}`;
-    toast(v ? "⭐ " + (params.kind === "div" ? name(item) : params.kind === "z" ? dname(item) : cname(item)) : t("favoriteRemoved"));
+    toast(v ? "⭐ " + (params.kind === "div" ? name(item) : params.kind === "z" ? dname(item) : params.kind === "l" ? lname(item) : cname(item)) : t("favoriteRemoved"));
   });
   bindAction(APP, "report", () => openReportModal(item, params.kind));
   speak(_lang === "bn" ? item.bn : item.en, _lang);
@@ -1400,9 +1473,9 @@ MOUNT.play = (p) => {};
 
 /* ---------- custom quiz setup ---------- */
 let SETUP = { scope: "bd", types: [], count: 10, adaptive: false };
-const ALL_TYPES = ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d-find", "wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt", "wsh", "wr"];
+const ALL_TYPES = ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d-find", "wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt", "wsh", "wr", "lm-c", "lm-name", "lm-find", "lm-div"];
 const BD_TYPES = ["bd-hq", "bd-fact", "bd-find", "bd-type", "d-div", "div-d", "d-find"];
-const WORLD_TYPES = ["wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt", "wsh", "wr"];
+const WORLD_TYPES = ["wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt", "wsh", "wr", "lm-c", "lm-name", "lm-find"];
 function screenCustom() {
   const scope = SETUP.scope;
   const shown = scope === "bd" ? BD_TYPES
@@ -1457,6 +1530,8 @@ function journeyNodes() {
   const nodes = [{ id: "div:", kind: "div", key: "", icon: "🗺️", label: t("deckDivisions"), color: "var(--brand)" }];
   for (const d of DIVS) nodes.push({ id: "dist:" + d.id, kind: "dist", key: d.id, icon: "🧩", label: tvar("deckDistrictsOf", { X: name(d) }), color: DIV_PALETTE[d.id] });
   for (const r of REGIONS) nodes.push({ id: "region:" + r.id, kind: "region", key: r.id, icon: "🌍", label: tvar("deckRegion", { X: _lang === "bn" ? r.bn : r.en }), color: "var(--info)" });
+  nodes.push({ id: "lm:bd", kind: "lm", key: "bd", icon: "🏛️", label: t("deckLandmarksBD"), color: "var(--saffron-2)" });
+  nodes.push({ id: "lm:world", kind: "lm", key: "world", icon: "🗼", label: t("deckLandmarksWorld"), color: "var(--saffron-2)" });
   return nodes;
 }
 function nodeStars(p, id) { const pct = (p.journey || {})[id]; return pct == null ? 0 : pct >= 90 ? 3 : pct >= 70 ? 2 : pct >= 50 ? 1 : 0; }
@@ -1507,6 +1582,15 @@ function deckFor(kind, key) {
         sub: `${t("district")} · ${name(div)}`,
         back: [[t("division"), name(div)], [t("pop"), fmtNum(d.pop)], [t("area"), fmtNum(d.areaKm2) + " km²"], [t("upazilas"), fmtNum(d.upazilas)]] })) };
   }
+  if (kind === "lm") {
+    const bd = key === "bd";
+    const ls = LANDMARKS.filter((l) => l.scope === (bd ? "bd" : "world"));
+    return { title: t(bd ? "deckLandmarksBD" : "deckLandmarksWorld"), scope: bd ? "bd" : "world", types: bd ? ["lm-div", "lm-name", "lm-find"] : ["lm-c", "lm-name", "lm-find"],
+      items: ls.map((l) => ({ id: l.id, ent: "l", name: lname(l), speak: _lang === "bn" ? l.bn : l.en, photo: lmPhotoSrc(l), color: l.kind === "natural" ? "#2FA56A" : l.kind === "ancient" ? "#8D6E63" : "var(--brand)",
+        sub: lmPlace(l),
+        back: [[t("whereIs"), lmPlace(l)], [t("region"), bd ? name(divIdx[l.div]) : regionBn(ctryIdx[l.country] ? ctryIdx[l.country].region : "")]],
+        fact: lfact(l) })) };
+  }
   const reg = REGIONS.find((r) => r.id === key) || REGIONS[0];
   const cs = CTRY.filter((c) => c.region === reg.en);
   return { title: tvar("deckRegion", { X: _lang === "bn" ? reg.bn : reg.en }), scope: "world", types: ["wf", "wh", "hc", "world-find", "wt", "wsh"],
@@ -1526,6 +1610,8 @@ function screenLearn() {
       <div class="deck-list">
         <button class="item deck" data-action="learn-deck" data-kind="div"><span class="ring" style="background:var(--brand)">🗺️</span><span class="tx"><span class="nm">${t("deckDivisions")}</span><span class="sb">8 · ${t("levelDivisions")}</span></span><span class="st">▶</span></button>
         ${DIVS.map((d) => `<button class="item deck" data-action="learn-deck" data-kind="dist" data-key="${d.id}"><span class="ring" style="background:${DIV_PALETTE[d.id]}">🧩</span><span class="tx"><span class="nm">${tvar("deckDistrictsOf", { X: name(d) })}</span><span class="sb">${d.districts} · ${t("levelDistricts")}</span></span><span class="st">▶</span></button>`).join("")}
+        <button class="item deck" data-action="learn-deck" data-kind="lm" data-key="bd"><span class="ring" style="background:var(--saffron-2)">🏛️</span><span class="tx"><span class="nm">${t("deckLandmarksBD")}</span><span class="sb">${LANDMARKS.filter((l) => l.scope === "bd").length}</span></span></button>
+        <button class="item deck" data-action="learn-deck" data-kind="lm" data-key="world"><span class="ring" style="background:var(--saffron-2)">🏛️</span><span class="tx"><span class="nm">${t("deckLandmarksWorld")}</span><span class="sb">${LANDMARKS.filter((l) => l.scope === "world").length}</span></span></button>
         ${REGIONS.map((r) => `<button class="item deck" data-action="learn-deck" data-kind="region" data-key="${r.id}"><span class="ring" style="background:var(--info)">🌍</span><span class="tx"><span class="nm">${tvar("deckRegion", { X: _lang === "bn" ? r.bn : r.en })}</span><span class="sb">${CTRY.filter((c) => c.region === r.en).length} · ${t("sectionWorld")}</span></span><span class="st">▶</span></button>`).join("")}
       </div>
     </div>`);
@@ -1551,7 +1637,7 @@ function screenCards(params = {}) {
     <div class="flip" data-flip="1">
       <div class="flip-inner">
         <div class="face front" style="--accent:${it.color || "var(--brand)"}">
-          ${it.flag ? `<img class="card-flag" src="${flagUrl(it.flag)}" alt="">` : `<div class="card-swatch" style="background:${it.color}"></div>`}
+          ${it.photo ? `<img class="card-photo" src="${it.photo}" alt="" onerror="this.remove()">` : it.flag ? `<img class="card-flag" src="${flagUrl(it.flag)}" alt="">` : `<div class="card-swatch" style="background:${it.color}"></div>`}
           <div class="card-name">${it.name}</div>
           <div class="card-sub">${it.sub}</div>
           <div class="stars">${"★".repeat(stN)}${"☆".repeat(3 - stN)}</div>
@@ -1674,9 +1760,11 @@ function buildQuestionList({ scope, types, count, adaptive, items }) {
   if (scope === "bd" || scope === "both") {
     for (const ty of ["bd-hq", "bd-fact", "bd-find", "bd-type"]) if (types.includes(ty)) pool.push(...divQuestions(ty));
     for (const ty of ["d-div", "div-d", "d-find"]) if (types.includes(ty)) pool.push(...distQuestions(ty));
+    for (const ty of ["lm-div", "lm-name", "lm-find"]) if (types.includes(ty)) pool.push(...landmarkQuestions(ty, "bd"));
   }
   if (scope === "world" || scope === "both") {
     for (const ty of ["wf", "wc", "wh", "hc", "world-find", "wn", "wb", "wt", "wsh", "wr"]) if (types.includes(ty)) pool.push(...countryQuestions(ty));
+    for (const ty of ["lm-c", "lm-name", "lm-find"]) if (types.includes(ty)) pool.push(...landmarkQuestions(ty, "world"));
   }
   if (items) pool = pool.filter((q) => items.has(String(q.itemId || q.answerId)));
   if (!pool.length) return [];
@@ -1783,6 +1871,37 @@ function countryQuestions(ty) {
       const others = shuffle(REGIONS.filter((r) => r.id !== reg.id)).slice(0, 3);
       return { type: "wr", kind: "text", answerId: reg.id, itemId: c.id, answerLabel: _lang === "bn" ? reg.bn : reg.en, prompt: tvar("qprompts.wr", { X: cname(c) }),
         choices: shuffle([reg, ...others]).map((r) => ({ id: r.id, label: _lang === "bn" ? r.bn : r.en })) };
+    }
+    return null;
+  }).filter(Boolean);
+}
+/* v2.3: landmark questions. Every one shows a photo, so a landmark is only asked
+   when its picture can load: online, or from the offline picture pack. */
+function lmPhotoSrc(l) { return photoSrc(l.photo, "l-" + l.id); }
+function landmarkQuestions(ty, scope) {
+  const pool = LANDMARKS.filter((l) => l.scope === scope && l.photo && lmPhotoSrc(l));
+  return pool.map((l) => {
+    const base = { kind: "photo", photo: lmPhotoSrc(l), itemId: l.id, lmId: l.id };
+    if (ty === "lm-c") {
+      const c = ctryIdx[l.country];
+      if (!c) return null;
+      return { ...base, type: "lm-c", answerId: c.id, prompt: t("qprompts.lm-c"), choices: fillChoices(CTRY, c, (x) => cname(x), { regionBias: true }) };
+    }
+    if (ty === "lm-div") {
+      const dv = divIdx[l.div];
+      if (!dv) return null;
+      return { ...base, type: "lm-div", answerId: dv.id, prompt: t("qprompts.lm-div"), choices: fillChoices(DIVS, dv, (x) => name(x)) };
+    }
+    if (ty === "lm-name") {
+      const others = shuffle(pool.filter((x) => x.id !== l.id && (x.kind === l.kind || Math.random() < 0.3))).slice(0, 3);
+      while (others.length < 3) { const o = pool[Math.floor(Math.random() * pool.length)]; if (o.id !== l.id && !others.includes(o)) others.push(o); }
+      return { ...base, type: "lm-name", answerId: l.id, prompt: t("qprompts.lm-name"), choices: shuffle([l, ...others]).map((x) => ({ id: x.id, label: lname(x) })) };
+    }
+    if (ty === "lm-find") {
+      // tap the country (world) or the division (BD) the photo was taken in
+      if (scope === "world") { const c = ctryIdx[l.country]; if (!c) return null; return { ...base, kind: "map", map: "world", type: "lm-find", answerId: c.id, prompt: t("qprompts.lm-find") }; }
+      const dv = divIdx[l.div]; if (!dv) return null;
+      return { ...base, kind: "map", map: "bd", type: "lm-find", answerId: dv.id, prompt: t("qprompts.lm-find") };
     }
     return null;
   }).filter(Boolean);
@@ -1902,6 +2021,8 @@ MOUNT.session = function (conf) {
       inner = typeQuestionHTML(s, q, n);
     } else if (q.kind === "shape") {
       inner = shapeQuestionHTML(s, q, n);
+    } else if (q.kind === "photo") {
+      inner = photoQuestionHTML(s, q, n);
     } else {
       inner = textQuestionHTML(s, q, n);
     }
@@ -1949,6 +2070,16 @@ function textQuestionHTML(s, q, n) {
       ${q.choices.map((c, i) => `<button class="choice" data-choice="${c.id}"><span class="ltr">${"ABCD"[i]}</span><span class="nm">${c.label}</span></button>`).join("")}
     </div>`;
 }
+/* v2.3: photo question — a landmark picture (credited on its detail page) */
+function photoQuestionHTML(s, q, n) {
+  return `
+    ${qHead(s)}${qBar(s)}
+    <div class="q-prompt">${q.prompt}</div>
+    <img class="q-photo" src="${q.photo}" alt="" onerror="this.classList.add('broken')">
+    <div class="choices">
+      ${q.choices.map((c, i) => `<button class="choice" data-choice="${c.id}"><span class="ltr">${"ABCD"[i]}</span><span class="nm">${c.label}</span></button>`).join("")}
+    </div>`;
+}
 /* v2.1: silhouette question — the country's own map path, mainland-framed,
    filled in the brand colour on a plain card */
 function shapeQuestionHTML(s, q, n) {
@@ -1992,6 +2123,7 @@ function flagQuestionHTML(s, q, n) {
 function mapQuestionHTML(s, q, n) {
   return `${qHead(s)}${qBar(s)}
     <div class="q-prompt">${q.prompt}</div>
+    ${q.photo ? `<img class="q-photo sm" src="${q.photo}" alt="" onerror="this.classList.add('broken')">` : ""}
     <div class="map-wrap">
       <canvas class="map-canvas" data-mapcanvas="1" width="${q.map === "world" ? 900 : 640}" height="${q.map === "world" ? 640 : 840}"></canvas>
       ${mapControlsHTML()}
@@ -2075,6 +2207,7 @@ function answerSession(s, q, pick, spot, correctId) {
   setTimeout(() => { if (s.over) return; s.idx++; showNext(s); }, ok ? (q.kind === "type" ? 1200 : 950) : (q.kind === "type" || q.explain ? 2400 : 1800));
 }
 function entTypeOf(q) {
+  if (q.lmId) return "l";
   if (q.type === "bd-hq" || q.type === "bd-fact" || q.type === "bd-type" || q.map === "bd") return "d";
   if (q.type === "d-div" || q.type === "div-d" || q.type === "d-find" || q.map === "bd-d") return "z";
   return "c";
@@ -2206,8 +2339,9 @@ function finish() {
 /* ---------- results ---------- */
 function itemChip(q) {
   // a small labelled chip for a question's answer item: flag for countries,
-  // division colour swatch for BD
+  // division colour swatch for BD, 🏛️ for landmarks
   const id = q.itemId || q.answerId;
+  if (q.lmId && lmIdx[q.lmId]) return `<span class="chip">🏛️ ${lname(lmIdx[q.lmId])}</span>`;
   if (q.map === "bd" || q.type === "bd-hq" || q.type === "bd-fact") {
     const d = divIdx[id]; return d ? `<span class="chip"><span class="sw" style="background:${DIV_PALETTE[d.id]}"></span>${name(d)}</span>` : "";
   }
@@ -2241,7 +2375,10 @@ function screenResults(params) {
       <ul class="wrong-list" style="padding-left:0;margin-top:8px;list-style:none">${r.wrong.map((q) => {
         const correctId = q.itemId || q.answerId;
         let correctName;
-        if (q.map === "bd-d" || q.type === "d-div" || q.type === "d-find" || q.type === "div-d") {
+        if (q.lmId) {
+          const l = lmIdx[q.lmId];
+          correctName = q.type === "lm-name" ? lname(l) : `${lname(l)} → ${q.map === "bd" || q.type === "lm-div" ? name(divIdx[q.answerId]) : cname(ctryIdx[q.answerId])}`;
+        } else if (q.map === "bd-d" || q.type === "d-div" || q.type === "d-find" || q.type === "div-d") {
           const dd = distIdx[correctId] || distIdx[q.answerId];
           correctName = dd ? dname(dd) : correctId;
         } else if (q.type === "bd-fact" || q.type === "bd-hq" || (q.kind === "map" && q.map === "bd")) {
@@ -2250,7 +2387,7 @@ function screenResults(params) {
           correctName = cname(ctryIdx[correctId]);
         }
         const lbl = q.answerLabel || (q.choices ? (q.choices.find((c) => c.id === correctId) || { label: correctName }).label : correctName);
-        const icon = q.kind === "map" ? "📍 " : q.kind === "flag" ? `🏳️ ` : q.kind === "shape" ? "🧩 " : q.flagCode ? "❤️ " : "💬 ";
+        const icon = q.lmId ? "🏛️ " : q.kind === "map" ? "📍 " : q.kind === "flag" ? `🏳️ ` : q.kind === "shape" ? "🧩 " : q.flagCode ? "❤️ " : "💬 ";
         return `<li style="margin:6px 0"><span class="qw">${q.prompt.replace(/^❓\s*/, "").slice(0, 70)}</span><br><span class="qa">✅ ${icon}${lbl}</span></li>`;
       }).join("")}</ul>
       <button class="btn btn-paper btn-small" data-action="retry-wrong" style="margin-top:10px">${t("tryAgainBtn")}</button>
@@ -2599,6 +2736,7 @@ function drawMap(canvas, md, opts = {}) {
   if (md.kind === "world") drawAtlasOver(ctx, canvas, md, v, opts);
   else drawBDRivers(ctx, canvas, md, v, opts);
   if (opts.labels !== false) drawLabels(ctx, canvas, md, v, opts);
+  if (md.kind !== "world" && opts.mode === "explore") drawBDPins(ctx, canvas, md, v);
   // legend
   const legend = APP.querySelector(".map-legend");
   if (legend) {
@@ -2695,6 +2833,37 @@ function drawBDRivers(ctx, canvas, md, v, opts) {
     ctx.fillText(label, r.lx, r.ly - px(7));
   }
 }
+/* v2.3: landmark pins on the Bangladesh maps (explorer only) — tap one to open it */
+function drawBDPins(ctx, canvas, md, v) {
+  const cssScale = (canvas.clientWidth || md.W) / md.W;
+  const px = (n) => n / (cssScale * v.k);
+  const r = px(9);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const drawn = [];
+  for (const l of LANDMARKS) {
+    if (l.scope !== "bd" || !l.px) continue;
+    const [x, y] = l.px;
+    if (drawn.some(([dx, dy]) => Math.hypot(dx - x, dy - y) < r * 1.8)) continue; // clustered at this zoom — zoom in to separate
+    drawn.push([x, y]);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.fill();
+    ctx.lineWidth = px(1.5); ctx.strokeStyle = "#F49B1F"; ctx.stroke();
+    ctx.font = `${px(11)}px sans-serif`;
+    ctx.fillStyle = "#000";
+    ctx.fillText(l.kind === "natural" ? "🌿" : l.kind === "ancient" ? "🏺" : "🏛️", x, y + px(0.5));
+  }
+}
+function bdPinAt(canvas, md, v, x, y) {
+  const cssScale = (canvas.clientWidth || md.W) / md.W;
+  const r = 12 / (cssScale * v.k);
+  let best = null, bd = Infinity;
+  for (const l of LANDMARKS) {
+    if (l.scope !== "bd" || !l.px) continue;
+    const d = Math.hypot(x - l.px[0], y - l.px[1]);
+    if (d < r && d < bd) { bd = d; best = l; }
+  }
+  return best;
+}
 /* Labels are sized in on-screen CSS px (not map units) so they stay readable
    at every zoom, and placed greedily biggest-first so none overlap; zooming
    in makes room for more. The quiz target is never labelled. */
@@ -2734,6 +2903,10 @@ function drawLabels(ctx, canvas, md, v, opts) {
   const ctlTL = toPath(md.W - S(56), md.H - S(140)), ctlBR = toPath(md.W, md.H);
   const hintTL = toPath(0, md.H - S(44)), hintBR = toPath(S(Math.min(cssW * 0.7, 260)), md.H);
   const placed = [[ctlTL[0], ctlTL[1], ctlBR[0], ctlBR[1]], [hintTL[0], hintTL[1], hintBR[0], hintBR[1]]];
+  if (md.kind !== "world" && opts.mode === "explore") { // landmark pins are fixed; labels move out of their way
+    const pr = px(10);
+    for (const l of LANDMARKS) if (l.scope === "bd" && l.px) placed.push([l.px[0] - pr, l.px[1] - pr, l.px[0] + pr, l.px[1] + pr]);
+  }
   const minLand = md.kind === "world" ? 26 : 0; // CSS px of land needed before a country gets a label
   // keep a label inside the visible canvas ("apai Nawabganj" used to be cut at the edge)
   const [visL, visT] = toPath(0, 0), [visR, visB] = toPath(md.W, md.H);
@@ -2741,8 +2914,13 @@ function drawLabels(ctx, canvas, md, v, opts) {
     if (c.wCss < minLand && md.kind === "world") continue;
     const w = ctx.measureText(c.txt).width, h = px(size) * 1.25;
     if (md.kind !== "world") c.x = Math.min(Math.max(c.x, visL + w / 2 + px(4)), visR - w / 2 - px(4));
-    const r = [c.x - w / 2 - px(3), c.y - h / 2, c.x + w / 2 + px(3), c.y + h / 2];
-    if (placed.some((p) => r[0] < p[2] && r[2] > p[0] && r[1] < p[3] && r[3] > p[1])) continue;
+    let r = [c.x - w / 2 - px(3), c.y - h / 2, c.x + w / 2 + px(3), c.y + h / 2];
+    const hits = (rr) => placed.some((p) => rr[0] < p[2] && rr[2] > p[0] && rr[1] < p[3] && rr[3] > p[1]);
+    if (hits(r)) {
+      let ok = false;
+      for (const dy of [h * 1.1, -h * 1.1, h * 2.2]) { const rr = [r[0], r[1] + dy, r[2], r[3] + dy]; if (!hits(rr)) { r = rr; c.y += dy; ok = true; break; } }
+      if (!ok) continue;
+    }
     placed.push(r);
     ctx.lineWidth = px(3); ctx.strokeStyle = ink.halo; ctx.lineJoin = "round";
     ctx.strokeText(c.txt, c.x, c.y);
@@ -2839,7 +3017,12 @@ MOUNT.map = (params = {}) => {
   attachMapGestures(canvas, md, {
     redraw,
     hover: setHover,
-    tap: (id) => {
+    tap: (id, pt) => {
+      if (isBD && pt) {
+        const v = getView(canvas, md);
+        const pin = bdPinAt(canvas, md, v, (pt.x - v.tx) / v.k, (pt.y - v.ty) / v.k);
+        if (pin) { go("detail", { kind: "l", id: pin.id }); return; }
+      }
       if (!id || !objOf(id)) return;
       go("detail", kind === "world" ? { kind: "c", id } : kind === "bd-d" ? { kind: "z", id } : { kind: "div", id });
     },
@@ -3305,4 +3488,4 @@ function boot() {
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { PACKS, photoSrc, audioFile, installPack, removePack, drawShape, makeMapModel, EXTRAS, mascot, journeyNodes, nodeStars, childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };
+export const __test = { LANDMARKS, landmarkQuestions, lmPlace, PACKS, photoSrc, audioFile, installPack, removePack, drawShape, makeMapModel, EXTRAS, mascot, journeyNodes, nodeStars, childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };

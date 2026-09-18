@@ -104,7 +104,7 @@ Every option below is free to use commercially and works offline once bundled.
 - `[partial]` v2.1 label clamp; phone check pending **District map visual QA** — label density, tint contrast, the 64-district
   framing option (parked since v1.3). Needs a phone in hand; owner walks through with
   screenshots.
-- `[idea]` **Landmark pins on the BD map** — Sundarbans, Cox's Bazar beach, Sixty Dome
+- `[done]` v2.3 **Landmark pins on the BD map** — Sundarbans, Cox's Bazar beach, Sixty Dome
   Mosque, Paharpur, Lalbagh, Kantajew, Sajek, Saint Martin's. Wikidata coordinates (CC0).
 
 ### 1.4 Photos
@@ -120,7 +120,7 @@ Every option below is free to use commercially and works offline once bundled.
   each; 480 photos ≈ 7 MB. Today photos are online-only by design; a bundled tier
   keeps the app fully offline as promised. Ship as an *optional* "Download pictures"
   button in Parent Zone so the first install stays small.
-- `[idea]` **Landmark deck** — 100 world landmarks (Eiffel, Taj Mahal, Petra, Sydney
+- `[done]` v2.3 (100 world + 18 BD) **Landmark deck** — 100 world landmarks (Eiffel, Taj Mahal, Petra, Sydney
   Opera House…) from Wikidata "instance of: tourist attraction" + our curation. Photos
   via P18. Powers "Where is this?" mode (3).
 - `[idea]` **Sky / weather / food photos per country** — Commons categories. Lower
@@ -187,7 +187,7 @@ Every option below is free to use commercially and works offline once bundled.
 - `[idea]` **National symbols** deck — animal, bird, flower, tree, fruit, sport for
   Bangladesh (Royal Bengal tiger, doel/magpie robin, shapla, mango tree, jackfruit,
   kabaddi) then neighbours, then the world.
-- `[idea]` **Bangladesh landmarks deck** (from 1.3) and **world landmarks deck** (1.4).
+- `[done]` v2.3 **Bangladesh landmarks deck** (from 1.3) and **world landmarks deck** (1.4).
 - `[idea]` **Upazila explore** under each district (from 1.3).
 - `[idea]` **"Then and now" names** — Dacca→Dhaka, Chittagong→Chattogram,
   Bombay→Mumbai, Burma→Myanmar, Ceylon→Sri Lanka. Small deck, big classroom value.
@@ -197,7 +197,7 @@ Every option below is free to use commercially and works offline once bundled.
 ## 3. Modes and questions
 
 - `[done]` v2.1 ★ **Silhouette quiz** ("Which country is this shape?") — zero new data.
-- `[idea]` ★ **Where is this photo?** — landmark/capital photo → tap the country on the
+- `[done]` v2.3 ★ **Where is this photo?** — landmark/capital photo → tap the country on the
   map, or 4 choices. Needs 1.4.
 - `[partial]` v2.1 (continent yes, ocean no) **Which continent / which ocean borders it?** — needs 1.2 ocean layer.
 - `[idea]` **Which river flows through?** — needs rivers.
@@ -287,4 +287,6 @@ Every option below is free to use commercially and works offline once bundled.
 6. District map visual QA with the owner on a phone (1.3).
 
 **V2.2 "Bagha speaks"** shipped 18 September 2026 (picture pack live; voice pack waits on a
-Google TTS key). Next: **V2.3 "Landmarks"**: landmark deck + "Where is this photo?".
+Google TTS key). **V2.3 "Landmarks"** shipped 19 September 2026. Next candidates: continents &
+oceans as entities (2), national symbols deck (2), two-player pass-the-phone (3), streak
+freeze + avatar shop (4), Play Store wrapper + privacy page (5).

@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { COUNTRY_BN, REGION_BN } from "./bn.mjs";
 import { DIVISIONS, NATIONAL } from "./divisions.mjs";
 import { DISTRICTS } from "./districts.mjs";
+import { WORLD_LANDMARKS, BD_LANDMARKS } from "./landmarks-list.mjs";
+import { geoMercator, geoEqualEarth } from "d3-geo";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
@@ -138,6 +140,36 @@ const extras = countries
     };
   });
 
+// v2.3: landmarks — curated list + Wikidata coords/photo (.cache/landmarks.json),
+// pre-projected onto the two maps with the parameters the map builder exported
+const lmCache = exists(".cache/landmarks.json") ? JSON.parse(read(".cache/landmarks.json")) : {};
+const projOf = (file, name) => {
+  const m = read(file).match(new RegExp("var " + name + " = (\\{[^;]*\\});"));
+  if (!m) return null;
+  const P = JSON.parse(m[1]);
+  return (P.type === "mercator" ? geoMercator() : geoEqualEarth()).scale(P.scale).translate(P.translate);
+};
+const bdProj = projOf("assets/bd-map-data.js", "BD_PROJ");
+const worldProj = projOf("assets/world-map-data.js", "WORLD_PROJ");
+const iso3ToId = Object.fromEntries(countries.filter((c) => c.unMember).map((c) => [c.cca3, String(c.ccn3).padStart(3, "0")]));
+const landmarks = [...WORLD_LANDMARKS.map((l) => ({ ...l, scope: "world" })), ...BD_LANDMARKS.map((l) => ({ ...l, scope: "bd" })) ]
+  .map((l) => {
+    const r = lmCache[l.id];
+    if (!r || !r.coord) return null;
+    const pt = l.scope === "bd" ? bdProj([r.coord.lng, r.coord.lat]) : worldProj([r.coord.lng, r.coord.lat]);
+    const dist = l.scope === "bd" ? DISTRICTS.find((d) => d.id === l.c) : null;
+    return {
+      id: l.id, en: l.en, bn: l.bn, kind: l.kind, scope: l.scope,
+      country: l.scope === "world" ? iso3ToId[l.c] || null : null,   // world: country id
+      dist: dist ? dist.id : null, div: dist ? dist.div : null,       // bd: district + division
+      factEn: l.factEn, factBn: l.factBn,
+      lat: r.coord.lat, lng: r.coord.lng,
+      px: pt ? [Math.round(pt[0] * 10) / 10, Math.round(pt[1] * 10) / 10] : null,
+      photo: slimPhoto(r.photo),
+    };
+  }).filter(Boolean);
+if (landmarks.some((l) => l.scope === "world" && !l.country)) console.warn("landmarks without a country id:", landmarks.filter((l) => l.scope === "world" && !l.country).map((l) => l.id).join(", "));
+
 const divisions = DIVISIONS.map((d) => ({
   ...d,
   photo: photos[d.id] || null,
@@ -185,6 +217,7 @@ export const GEO={
   )},
   countries:${JSON.stringify(unMembers)},
   extras:${JSON.stringify(extras)},
+  landmarks:${JSON.stringify(landmarks)},
   divisions:${JSON.stringify(divisions, null, 0)},
   districts:${JSON.stringify(districts, null, 0)},
   bdLabels:${JSON.stringify(bdLabels)},
@@ -195,4 +228,4 @@ export const GEO={
 `;
 
 fs.writeFileSync(path.join(root, "geo-data.js"), geoData);
-console.log(`geo-data.js: ${unMembers.length} countries, ${extras.length} extras, ${divisions.length} divisions, ${districts.length} districts, ${worldMapKeys.length} map paths`);
+console.log(`geo-data.js: ${unMembers.length} countries, ${extras.length} extras, ${landmarks.length} landmarks, ${divisions.length} divisions, ${districts.length} districts, ${worldMapKeys.length} map paths`);
