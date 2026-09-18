@@ -1,7 +1,8 @@
 /* Phone-sized screenshots of app screens in headless Chrome, for visual QA.
    Usage: node scripts/shot.mjs [screen[,screen…]] [--out DIR]
    Screens: any `go()` name (home, map, map:world, journey, explore, play…);
-   "map:world" opens the world map, "map:dist" the district map.
+   "map:world" opens the world map, "map:dist" the district map,
+   "detail:050" a country detail by numeric id, "explore:extras" the territories list.
    Writes DIR/<screen>.png (default: .shots/). Not part of the build. */
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -49,9 +50,10 @@ try {
     const [name, sub] = sc.split(":");
     const params = name === "map" && sub === "world" ? `{kind:"world"}` : name === "map" && sub === "dist" ? `{kind:"bd", level:"dist"}` : "{}";
     await evalJs(ws, `location.hash = ""; window.__go ? window.__go(${JSON.stringify(name)}, ${params}) : null; 1`);
-    await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-bnav="${name}"], [data-nav="${name}"]'); if (b) b.click(); setTimeout(r, 300); })`);
+    await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-bnav="${name === "detail" ? "explore" : name}"], [data-nav="${name}"]'); if (b) b.click(); setTimeout(r, 300); })`);
     if (name === "map" && sub === "world") await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-action="map-kind"][data-kind="world"]'); if (b) b.click(); setTimeout(r, 600); })`);
     if (name === "explore" && sub === "extras") { await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-action="explore-scope"][data-scope="world"]'); if (b) b.click(); setTimeout(r, 400); })`); await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-action="explore-region"][data-region="extras"]'); if (b) b.click(); setTimeout(r, 400); })`); await evalJs(ws, `new Promise((r) => { const b = document.querySelector('#explore-list .item'); if (b) b.click(); setTimeout(r, 400); })`); }
+    if (name === "detail") { await evalJs(ws, `import("/src/engine.js").then((m) => { m.__test.go("detail", { kind: "c", id: "${sub || "050"}" }); return new Promise((r) => setTimeout(r, 700)); })`); await evalJs(ws, `window.scrollTo(0, 760); 1`); }
     if (name === "map" && sub === "dist") await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-action="map-level"][data-level="dist"]'); if (b) b.click(); setTimeout(r, 600); })`);
     await sleep(900);
     const shot = await send(ws, "Page.captureScreenshot", { format: "png" });

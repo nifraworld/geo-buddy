@@ -102,6 +102,12 @@ const unMembers = countries
       latlng: c.latlng || [],
       flagCode,
       hasMap: worldMapKeys.includes(id),
+      // v2.1 facts (all from the same dataset): currency, languages, dial code, demonym
+      currency: c.currencies ? Object.entries(c.currencies).slice(0, 2).map(([code, v]) => ({ code, name: v.name, symbol: v.symbol || "" })) : [],
+      languages: c.languages ? Object.values(c.languages).slice(0, 4) : [],
+      dial: c.idd && c.idd.root ? c.idd.root + ((c.idd.suffixes || []).length === 1 ? c.idd.suffixes[0] : "") : "",
+      demonym: (c.demonyms && c.demonyms.eng && c.demonyms.eng.m) || "",
+      tld: (c.tld && c.tld[0]) || "",
     };
   });
 

@@ -105,6 +105,7 @@ const L = {
     mapCountBD: "{d} divisions · {z} districts", mapCountWorld: "{c} countries on the map",
     extrasChip: "Territories & others", extrasNote: "{n} places that are not UN member countries — islands, territories and special regions. Just for exploring; they never come up in quizzes.",
     extraTerritory: "Territory or dependency", extraIndependent: "Independent, not a UN member", partOf: "Region",
+    currency: "Money", languages: "Languages", dial: "Phone code", demonym: "People are called", tld: "Web address", moreFacts: "More facts",
     "map.hint.quiz": "Tap the correct place on the map",
     back: "Back",
     search: "Search…",
@@ -231,6 +232,7 @@ const L = {
     mapCountBD: "{d}টি বিভাগ · {z}টি জেলা", mapCountWorld: "মানচিত্রে {c}টি দেশ",
     extrasChip: "অঞ্চল ও অন্যান্য", extrasNote: "{n}টি জায়গা যারা জাতিসংঘের সদস্য দেশ নয় — দ্বীপ, অঞ্চল ও বিশেষ এলাকা। শুধু ঘুরে দেখার জন্য; কুইজে আসবে না।",
     extraTerritory: "অঞ্চল বা অধীনস্থ এলাকা", extraIndependent: "স্বাধীন, জাতিসংঘের সদস্য নয়", partOf: "অঞ্চল",
+    currency: "মুদ্রা", languages: "ভাষা", dial: "ফোন কোড", demonym: "মানুষকে বলা হয়", tld: "ওয়েব ঠিকানা", moreFacts: "আরও তথ্য",
     "map.hint.quiz": "সঠিক স্থানে স্পর্শ করো",
     back: "ফিরে যাও",
     search: "খোঁজো…",
@@ -1190,11 +1192,23 @@ function screenDetail(params) {
         <div class="stat"><b>${c.population ? fmtPop(c.population) : "—"}</b><small>${t("pop")}</small></div>
       </div>
       ${c.subRegion && c.subRegion !== c.region ? `<div class="factbox"><b>${t("subRegion")}:</b> ${_lang === "bn" ? (SUBREGION_BN[c.subRegion] || c.subRegion) : c.subRegion}</div>` : ""}
+      ${factRows(c)}
       <h3>${t("neighbors")}</h3>
       <div class="chips">${neigh}</div>
     </div>
     <div class="btn-row"><button class="btn btn-primary" data-nav="play">▶ ${t("play")}</button></div>
     ${reportLink()}`);
+}
+/* v2.1: money / languages / phone code / demonym / web address as a compact list */
+function factRows(c) {
+  const rows = [];
+  if (c.currency && c.currency.length) rows.push([t("currency"), c.currency.map((m) => `${m.symbol ? m.symbol + " " : ""}${m.name} (${m.code})`).join(", ")]);
+  if (c.languages && c.languages.length) rows.push([t("languages"), c.languages.join(", ")]);
+  if (c.dial) rows.push([t("dial"), c.dial]);
+  if (c.demonym) rows.push([t("demonym"), c.demonym]);
+  if (c.tld) rows.push([t("tld"), c.tld]);
+  if (!rows.length) return "";
+  return `<h3>${t("moreFacts")}</h3><dl class="fact-list">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>`;
 }
 function reportLink() { return `<button class="report-link" data-action="report">⚠️ ${t("reportMistake")}</button>`; }
 function openReportModal(item, kind) {
