@@ -400,6 +400,9 @@ textarea.lic-inp{resize:vertical;min-height:90px;}
 @keyframes bob{0%,100%{transform:translateY(0) rotate(-2deg);}50%{transform:translateY(-6px) rotate(2deg);}}
 .hero-mascot{display:flex;justify-content:center;margin:0 auto 10px;}
 .hero-mascot-sm{flex-shrink:0;}
+.mascot-btn{background:none;border:none;padding:0;cursor:pointer;line-height:0;}
+.mascot-btn.hop .mascot{animation:hop .5s cubic-bezier(.2,1.4,.4,1);}
+@keyframes hop{0%{transform:translateY(0) scale(1);}40%{transform:translateY(-14px) scale(1.08) rotate(-4deg);}100%{transform:translateY(0) scale(1);}}
 .bubble{position:relative;background:var(--paper);color:var(--ink);border-radius:14px;padding:8px 12px;font-size:13px;font-weight:700;margin-top:6px;display:inline-block;}
 .bubble:before{content:'';position:absolute;left:-8px;top:12px;border:6px solid transparent;border-right-color:var(--paper);border-left:0;}
 .empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:22px 12px;text-align:center;color:var(--ink-soft);font-weight:700;grid-column:1 / -1;}

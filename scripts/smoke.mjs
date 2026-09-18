@@ -214,6 +214,11 @@ assert(T.APP_LOCKED === false, "app starts unlocked");
   assert(lakes.length >= 10, "lakes layer present");
   assert(text.some((x) => x.en === "Bay of Bengal" && x.bn) && text.filter((x) => x.kind === "continent").length === 7, "ocean + 7 continent labels, bilingual");
 }
+// v2.2: offline packs
+assert(T.photoSrc({ url: "https://x/y.jpg" }, "c-050") === "https://x/y.jpg", "photoSrc: remote url when no pack and online");
+assert(T.photoSrc(null, "c-050") === "", "photoSrc: nothing without a photo");
+assert(T.audioFile("ঢাকা") === null, "audioFile: null before any pack/manifest");
+assert(T.PACKS.photos.cache.startsWith("gb-pack-") && T.PACKS.audio.cache.startsWith("gb-pack-"), "pack caches use the gb-pack- prefix the SW preserves");
 // v2.1: Bangladesh rivers baked into the division map data
 {
   const fs = await import("node:fs");

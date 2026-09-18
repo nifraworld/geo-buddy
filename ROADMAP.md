@@ -267,6 +267,26 @@ Ideas that are not scheduled live in `DREAM-BACKLOG.md`; releases are lifted fro
     label clamp (Chapai Nawabganj was cut at the edge). Smoke test now loads the map
     globals and checks dots, rivers, lakes, ocean labels, extras, shapes, continents.
   - Still yours: the district map on a real phone (label density / tint contrast).
+- **V2.2** "Bagha speaks" — offline packs + a talking mascot. ✅ (voice clips pending a key — see below)
+  - **Offline packs** (Parent Zone → 📦): optional downloads kept in their own Cache
+    Storage buckets (`gb-pack-*`) that the service worker preserves across updates.
+    Progress "n of total…", Remove button, hidden until the pack is published.
+  - **Pictures pack**: 260 photos (8 divisions, 64 districts, 188 countries) at 400 px
+    WebP q60 = **4.0 MB**, built by `npm run photos:pack` (`scripts/photos-pack.mjs`) into
+    `assets/photos/` + `manifest.json`. Detail pages use the pack copy when installed,
+    else the Commons thumbnail when online, else the placeholder. Verified in headless
+    Chrome: install → network offline → `/assets/photos/c-050.webp` still 200.
+  - **Bangla voice pack — pipeline ready, clips not yet made.** `scripts/audio.mjs`
+    collects the 459 Bangla phrases the app can say (country + capital names, divisions,
+    districts, regions, Bagha's lines) and synthesises them with Google Cloud
+    Text-to-Speech (bn-IN WaveNet, Opus) into `assets/audio/bn/` + `manifest.json`.
+    Idempotent — only missing clips are billed. Needs `GOOGLE_TTS_KEY` (owner: create a
+    Google Cloud project → enable Text-to-Speech API → API key; ~7,000 characters, inside
+    the free tier). `speak()` plays a clip when one exists for the exact text and falls
+    back to the phone's TTS otherwise, so nothing changes until the clips are published.
+  - **Bagha talks**: tap the mascot on Home → hop animation + the tip read aloud.
+  - Photo pack is git-tracked (Cloudflare Pages serves it); not in the SW precache, so
+    the base install stays ≈ 3 MB.
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

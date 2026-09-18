@@ -105,7 +105,7 @@ Every option below is free to use commercially and works offline once bundled.
   duds (P18 is occasionally a coat of arms or a map).
 - `[done]` v2.1 (64/64) ★ **One photo per district (64) via Wikidata P18 / Commons category**, with a
   fallback list we curate by hand (we did this for the 8 divisions already).
-- `[idea]` **Bundle low-res copies for offline** — 320 px WebP at quality 70 ≈ 12–18 KB
+- `[done]` v2.2 (400 px, 4.0 MB, optional download) **Bundle low-res copies for offline** — 320 px WebP at quality 70 ≈ 12–18 KB
   each; 480 photos ≈ 7 MB. Today photos are online-only by design; a bundled tier
   keeps the app fully offline as promised. Ship as an *optional* "Download pictures"
   button in Parent Zone so the first install stays small.
@@ -137,7 +137,7 @@ Every option below is free to use commercially and works offline once bundled.
 
 ### 1.6 Audio
 
-- `[idea]` ★ **Pre-recorded Bangla name audio** — Bangla TTS is unreliable on cheap
+- `[blocked]` v2.2 pipeline + playback done; needs `GOOGLE_TTS_KEY` from the owner to make the clips ★ **Pre-recorded Bangla name audio** — Bangla TTS is unreliable on cheap
   Android phones (the main market). Options: (a) Google Cloud TTS `bn-IN` WaveNet,
   ≈ 270 clips × ~1.5 s ≈ 1.5 MB as Opus/OGG — allowed for commercial use; (b) a
   native speaker recording (better warmth, one weekend). Fall back to TTS when a clip
@@ -210,7 +210,7 @@ Every option below is free to use commercially and works offline once bundled.
 
 - `[idea]` **Bagha animation set** — Rive or Lottie: idle, cheer, sad, sleep, point-at-
   map. Today: SVG moods + CSS bob only.
-- `[idea]` **Bagha talks** — short spoken lines (the pre-recorded audio pipeline from 1.6)
+- `[partial]` v2.2 (tap Bagha → hop + tip read aloud; real voice once the audio pack exists) **Bagha talks** — short spoken lines (the pre-recorded audio pipeline from 1.6)
   on level-up, streak, first launch.
 - `[idea]` **Streak freeze** (one per week, earned by a perfect daily).
 - `[idea]` **Avatar shop** — spend XP on hats/backgrounds for the profile avatar. Purely
@@ -235,7 +235,7 @@ Every option below is free to use commercially and works offline once bundled.
   account, progress stored on device, optional school sharing, no ads, no trackers.
 - `[idea]` **iOS polish** — add-to-home-screen prompt, safe areas (done in v2.0), TTS
   voice selection on Safari.
-- `[idea]` **Optional asset packs** — "Download pictures (7 MB)" / "Download Bangla
+- `[done]` v2.2 **Optional asset packs** — "Download pictures (7 MB)" / "Download Bangla
   voice (1.5 MB)" in Parent Zone so the base install stays ≈ 3 MB.
 - `[idea]` **Lighthouse / a11y pass** — contrast on dark theme, focus order, reduced
   motion (partly done), large-text wrapping at 360 px.
@@ -275,5 +275,5 @@ Every option below is free to use commercially and works offline once bundled.
 5. Silhouette quiz + "Which continent?" (3) — free wins from the new data.
 6. District map visual QA with the owner on a phone (1.3).
 
-Then **V2.2 "Bagha speaks"**: Bangla name audio (1.6), Bagha lines, offline picture
-pack. Then **V2.3 "Landmarks"**: landmark deck + "Where is this photo?".
+**V2.2 "Bagha speaks"** shipped 18 September 2026 (picture pack live; voice pack waits on a
+Google TTS key). Next: **V2.3 "Landmarks"**: landmark deck + "Where is this photo?".

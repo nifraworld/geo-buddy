@@ -93,7 +93,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((ks) => ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      .then((ks) => ks.filter((k) => k !== CACHE && k.indexOf("gb-pack-") !== 0).map((k) => caches.delete(k)))
       .then(() => self.clients.claim())
   );
 });

@@ -107,6 +107,9 @@ const L = {
     extrasChip: "Territories & others", extrasNote: "{n} places that are not UN member countries — islands, territories and special regions. Just for exploring; they never come up in quizzes.",
     extraTerritory: "Territory or dependency", extraIndependent: "Independent, not a UN member", partOf: "Region",
     currency: "Money", languages: "Languages", dial: "Phone code", demonym: "People are called", tld: "Web address", moreFacts: "More facts",
+    packsTitle: "Offline packs", packsSub: "Optional downloads so pictures and voices work without internet",
+    packPhotos: "Pictures", packPhotosSub: "A photo for every country and district", packAudio: "Bangla voice", packAudioSub: "Real spoken names instead of the phone's robot voice",
+    packGet: "Download", packRemove: "Remove", packDone: "Downloaded", packBusy: "{n} of {total}…", packNeedNet: "Connect to the internet to download", packNotReady: "Coming soon", packFail: "Download stopped — try again",
     "map.hint.quiz": "Tap the correct place on the map",
     back: "Back",
     search: "Search…",
@@ -236,6 +239,9 @@ const L = {
     extrasChip: "অঞ্চল ও অন্যান্য", extrasNote: "{n}টি জায়গা যারা জাতিসংঘের সদস্য দেশ নয় — দ্বীপ, অঞ্চল ও বিশেষ এলাকা। শুধু ঘুরে দেখার জন্য; কুইজে আসবে না।",
     extraTerritory: "অঞ্চল বা অধীনস্থ এলাকা", extraIndependent: "স্বাধীন, জাতিসংঘের সদস্য নয়", partOf: "অঞ্চল",
     currency: "মুদ্রা", languages: "ভাষা", dial: "ফোন কোড", demonym: "মানুষকে বলা হয়", tld: "ওয়েব ঠিকানা", moreFacts: "আরও তথ্য",
+    packsTitle: "অফলাইন প্যাক", packsSub: "ইন্টারনেট ছাড়াও ছবি ও কণ্ঠ কাজ করার জন্য ঐচ্ছিক ডাউনলোড",
+    packPhotos: "ছবি", packPhotosSub: "প্রতিটি দেশ ও জেলার একটি ছবি", packAudio: "বাংলা কণ্ঠ", packAudioSub: "ফোনের যান্ত্রিক কণ্ঠের বদলে আসল উচ্চারণ",
+    packGet: "ডাউনলোড", packRemove: "সরাও", packDone: "ডাউনলোড হয়েছে", packBusy: "{total}টির মধ্যে {n}…", packNeedNet: "ডাউনলোডের জন্য ইন্টারনেটে যুক্ত হোন", packNotReady: "শিগগিরই আসছে", packFail: "ডাউনলোড থেমে গেছে — আবার চেষ্টা করুন",
     "map.hint.quiz": "সঠিক স্থানে স্পর্শ করো",
     back: "ফিরে যাও",
     search: "খোঁজো…",
@@ -786,7 +792,85 @@ function confetti() {
     setTimeout(() => c.remove(), 3600);
   }
 }
+/* ================= offline packs (v2.2) =================
+   Optional downloads kept in their own Cache Storage buckets (gb-pack-*), which
+   the service worker leaves alone on updates. A pack's manifest lists its files;
+   D.settings.packs[id] = { files, bytes } once installed. */
+const PACKS = {
+  photos: { cache: "gb-pack-photos", base: "assets/photos/", manifest: "assets/photos/manifest.json", list: (m) => m.files.map((k) => k + ".webp") },
+  audio: { cache: "gb-pack-audio", base: "assets/audio/bn/", manifest: "assets/audio/bn/manifest.json", list: (m) => [...new Set(Object.values(m.files))] },
+};
+function packInfo(id) { return (D.settings.packs || {})[id] || null; }
+function packHas(id, file) { const i = packInfo(id); return !!(i && i.set && i.set.has(file)); }
+function hydratePacks() { for (const i of Object.values(D.settings.packs || {})) if (i && Array.isArray(i.files) && !i.set) i.set = new Set(i.files); }
+async function packManifest(id) {
+  const res = await fetch(PACKS[id].manifest, { cache: "no-cache" });
+  if (!res.ok) throw new Error("manifest " + res.status);
+  return res.json();
+}
+async function installPack(id, onProgress) {
+  const def = PACKS[id];
+  const m = await packManifest(id);
+  const files = def.list(m);
+  const c = await caches.open(def.cache);
+  let done = 0;
+  const failed = [];
+  for (let i = 0; i < files.length; i += 6) {
+    await Promise.all(files.slice(i, i + 6).map(async (f) => {
+      const url = def.base + f;
+      try {
+        if (!(await c.match(url))) { const r = await fetch(url); if (!r.ok) throw new Error(r.status); await c.put(url, r); }
+      } catch { failed.push(f); }
+      done++;
+    }));
+    if (onProgress) onProgress(done, files.length);
+  }
+  if (failed.length > files.length * 0.1) throw new Error("too many failed: " + failed.length);
+  const ok = files.filter((f) => !failed.includes(f));
+  D.settings.packs = D.settings.packs || {};
+  D.settings.packs[id] = { files: ok, bytes: m.bytes || 0, v: m.v || 1, audioMap: id === "audio" ? m.files : undefined };
+  save(); hydratePacks();
+  return ok.length;
+}
+async function removePack(id) {
+  try { await caches.delete(PACKS[id].cache); } catch {}
+  if (D.settings.packs) delete D.settings.packs[id];
+  save();
+}
+/* the photo to show for an entity: the offline pack copy when installed, else
+   the Commons thumbnail when online */
+function photoSrc(ph, key) {
+  if (key && packHas("photos", key + ".webp")) return PACKS.photos.base + key + ".webp";
+  return ph && navigator.onLine ? ph.url : "";
+}
+/* a pre-recorded Bangla clip for this exact text, if the voice pack has it
+   (or we are online and the clip exists on the server) */
+let AUDIO_MAP = null; // text → file, from the manifest (loaded lazily when online)
+function audioFile(text) {
+  const key = String(text || "").normalize("NFC").trim();
+  const i = packInfo("audio");
+  if (i && i.audioMap && i.audioMap[key]) return PACKS.audio.base + i.audioMap[key];
+  if (AUDIO_MAP && AUDIO_MAP[key] && navigator.onLine) return PACKS.audio.base + AUDIO_MAP[key];
+  return null;
+}
+let _clip = null;
+function playClip(url, cb) {
+  try {
+    if (_clip) { _clip.pause(); _clip = null; }
+    const a = new Audio(url);
+    _clip = a;
+    if (cb) a.onended = cb;
+    return a.play().then(() => true).catch(() => false);
+  } catch { return Promise.resolve(false); }
+}
 function speak(text, lang, cb) {
+  if (lang === "bn") {
+    const url = audioFile(text);
+    if (url) { playClip(url, cb).then((ok) => { if (!ok) speakTTS(text, lang, cb); }); return; }
+  }
+  speakTTS(text, lang, cb);
+}
+function speakTTS(text, lang, cb) {
   try {
     if (!("speechSynthesis" in window)) return;
     speechSynthesis.cancel();
@@ -938,7 +1022,7 @@ function screenHome() {
   const mood = !doneToday ? "wow" : streak >= 3 ? "happy" : "think";
   return html(`
     <div class="home-hero">
-      <div class="hero-mascot-sm">${mascot(mood, 72, "bob")}</div>
+      <button class="hero-mascot-sm mascot-btn" data-action="bagha-say" aria-label="Bagha">${mascot(mood, 72, "bob")}</button>
       <div class="hero-txt">
         <div class="greet">${greet}, ${act.name.split(" ")[0]}! 👋</div>
         <div class="bubble">${tip}</div>
@@ -977,6 +1061,13 @@ function screenHome() {
     <p class="foot">geobuddy.nifraworld.com · v${GEO.version || ""}</p>`);
 }
 MOUNT.home = (p) => {
+  // tap Bagha: a little hop and the tip read aloud (a pre-recorded clip when the voice pack has it)
+  bindAction(APP, "bagha-say", (e, btn) => {
+    const tip = APP.querySelector(".bubble");
+    btn.classList.remove("hop"); void btn.offsetWidth; btn.classList.add("hop");
+    sfx("tap");
+    if (tip) speak(tip.textContent.trim(), _lang);
+  });
   bindAction(APP, "home-practise", () => {
     const sug = suggestPractice(profile());
     if (!scopeAllowed(sug.scope)) return;
@@ -1111,9 +1202,10 @@ function divColor(id) {
 
 /* ---------- detail ---------- */
 /* photo (online only, lazy) + placeholder; credit line goes in the card */
-function photoBlock(ph, alt) {
-  return ph && navigator.onLine
-    ? `<img class="detail-photo" loading="lazy" src="${ph.url}" alt="${alt}" onerror="this.remove()">`
+function photoBlock(ph, alt, key) {
+  const src = photoSrc(ph, key);
+  return src
+    ? `<img class="detail-photo" loading="lazy" src="${src}" alt="${alt}" onerror="this.remove()">`
     : `<div class="photo-ph">${ph ? t("off") + " · " + ph.file : ""}${!ph ? "🖼️" : ""}</div>`;
 }
 function photoCredit(ph) {
@@ -1127,9 +1219,7 @@ function screenDetail(params) {
     const ph = d.photo;
     const stN = starShown(p, "d", id);
     const speakMe = () => speak(_lang === "bn" ? d.bn : d.en, _lang);
-    const img = ph && navigator.onLine
-      ? `<img class="detail-photo" loading="lazy" src="${ph.url}" alt="${name(d)}" onerror="this.remove()">`
-      : `<div class="photo-ph">${ph ? t("off") + " · " + ph.file : ""}${!ph ? "🖼️" : ""}</div>`;
+    const img = photoBlock(ph, name(d), "d-" + d.id);
     return html(`
       <button class="btn btn-paper btn-small" data-action="listen"><span class="icon-txt">🔊</span> ${t("listen")}</button>
       <div style="text-align:center;margin:6px 0"><h1 style="color:var(--green)">${name(d)}</h1><span class="stars">${"★".repeat(stN)}${"☆".repeat(3 - stN)}</span></div>
@@ -1162,7 +1252,7 @@ function screenDetail(params) {
         <span class="stars">${"★".repeat(stN)}${"☆".repeat(3 - stN)}</span>
         <div class="official-txt">${t("district")} · ${name(div)}</div>
       </div>
-      ${photoBlock(d.photo, dname(d))}
+      ${photoBlock(d.photo, dname(d), "z-" + d.id)}
       <div class="btn-row">
         <button class="btn btn-paper btn-small" data-action="listen"><span class="icon-txt">🔊</span> ${t("listen")}</button>
         <button class="btn btn-paper btn-small ${favH ? "fav-on" : ""}" data-action="fav"><span class="icon-txt">${favH ? "⭐" : "☆"}</span> ${t("favorite")}</button>
@@ -1196,7 +1286,7 @@ function screenDetail(params) {
       ${nativeTxt ? `<div class="native-txt">${nativeTxt}</div>` : ""}
     </div>
     <img class="q-flag" src="${flagUrl(c.flagCode)}" alt="${cname(c)}" onerror="this.remove()">
-    ${c.photo ? photoBlock(c.photo, cname(c)) : ""}
+    ${c.photo ? photoBlock(c.photo, cname(c), "c-" + c.id) : ""}
     <div class="btn-row">
       <button class="btn btn-paper btn-small" data-action="listen"><span class="icon-txt">🔊</span> ${t("listen")}</button>
       <button class="btn btn-paper btn-small ${favH ? "fav-on" : ""}" data-action="fav"><span class="icon-txt">${favH ? "⭐" : "☆"}</span> ${t("favorite")}</button>
@@ -2851,6 +2941,48 @@ function buyCard() {
       </div>
     </div>`;
 }
+function packsCard() {
+  const row = (id, icon, title, sub) => {
+    const i = packInfo(id);
+    const mb = i && i.bytes ? ` · ${(i.bytes / 1048576).toFixed(1)} MB` : "";
+    return `<div class="setting" data-pack="${id}">
+      <span><span class="tt">${icon} ${title}</span><br><span class="ds">${sub}</span><br><span class="ds pack-state">${i ? "✅ " + t("packDone") + mb : `<span data-pack-size="${id}"></span>`}</span></span>
+      ${i ? `<button class="btn btn-mini" data-action="pack-rm" data-id="${id}" style="background:var(--cream);color:var(--bad)">${t("packRemove")}</button>`
+          : `<button class="btn btn-mini btn-primary" data-action="pack-get" data-id="${id}">📥 ${t("packGet")}</button>`}
+    </div>`;
+  };
+  return `<div class="card">
+    <h3>📦 ${t("packsTitle")}</h3>
+    <p class="ds" style="margin:4px 0 6px">${t("packsSub")}</p>
+    ${row("photos", "🖼️", t("packPhotos"), t("packPhotosSub"))}
+    ${row("audio", "🗣️", t("packAudio"), t("packAudioSub"))}
+  </div>`;
+}
+function mountPacks() {
+  // show sizes for packs not yet installed (needs the network)
+  APP.querySelectorAll("[data-pack-size]").forEach(async (el) => {
+    const id = el.getAttribute("data-pack-size");
+    if (!navigator.onLine) { el.textContent = t("packNeedNet"); return; }
+    try {
+      const m = await packManifest(id);
+      const n = PACKS[id].list(m).length;
+      el.textContent = n ? `${n} · ${((m.bytes || 0) / 1048576).toFixed(1)} MB` : t("packNotReady");
+      if (!n) el.closest("[data-pack]").classList.add("hidden"); // pack not published yet — no point showing it
+    } catch { el.closest("[data-pack]").classList.add("hidden"); }
+  });
+  bindAction(APP, "pack-get", async (e, btn) => {
+    const id = btn.getAttribute("data-id");
+    if (!navigator.onLine) { toast(t("packNeedNet")); return; }
+    btn.disabled = true;
+    const st = btn.closest("[data-pack]").querySelector(".pack-state");
+    try {
+      await installPack(id, (n, total) => { st.textContent = tvar("packBusy", { n, total }); });
+      sfx("correct"); toast("✅ " + t("packDone"));
+      render("parent");
+    } catch { btn.disabled = false; st.textContent = t("packFail"); toast(t("packFail")); }
+  });
+  bindAction(APP, "pack-rm", async (e, btn) => { await removePack(btn.getAttribute("data-id")); render("parent"); });
+}
 function licCard() {
   const l = licence();
   const has = !!l.key;
@@ -2908,6 +3040,7 @@ function screenParent() {
         <button class="btn btn-paper" data-nav="about">ℹ️ ${t("about")}</button>
       </div>
     </div>
+    ${packsCard()}
     ${licCard()}
     <div class="card">
       <h3>🏅 ${t("badgeTitle")}</h3>
@@ -2931,6 +3064,7 @@ function screenParent() {
     </div>`);
 }
 MOUNT.parent = (params) => {
+  mountPacks();
   bindAction(APP, "p-sound", (e) => { D.settings.soundEnabled = !D.settings.soundEnabled; soundOn = D.settings.soundEnabled; save(); if (soundOn) sfx("tap"); render("parent"); });
   bindAction(APP, "p-theme", (e, btn) => { D.settings.theme = btn.getAttribute("data-v"); save(); applyTheme(); render("parent"); });
   bindAction(APP, "p-lock", (e) => { D.settings.lockLang = !D.settings.lockLang; save(); render("parent"); });
@@ -3160,6 +3294,8 @@ function setupServiceWorker() {
 }
 function boot() {
   load();
+  hydratePacks();
+  if (navigator.onLine && typeof fetch === "function") fetch(PACKS.audio.manifest).then((r) => r.ok ? r.json() : null).then((m) => { if (m && m.files) AUDIO_MAP = m.files; }).catch(() => {});
   if (licence().key) refreshLicence(true);
   go("welcome");
   setupServiceWorker();
@@ -3169,4 +3305,4 @@ function boot() {
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { drawShape, makeMapModel, EXTRAS, mascot, journeyNodes, nodeStars, childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };
+export const __test = { PACKS, photoSrc, audioFile, installPack, removePack, drawShape, makeMapModel, EXTRAS, mascot, journeyNodes, nodeStars, childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };
