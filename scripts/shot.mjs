@@ -51,6 +51,7 @@ try {
     await evalJs(ws, `location.hash = ""; window.__go ? window.__go(${JSON.stringify(name)}, ${params}) : null; 1`);
     await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-bnav="${name}"], [data-nav="${name}"]'); if (b) b.click(); setTimeout(r, 300); })`);
     if (name === "map" && sub === "world") await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-action="map-kind"][data-kind="world"]'); if (b) b.click(); setTimeout(r, 600); })`);
+    if (name === "explore" && sub === "extras") { await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-action="explore-scope"][data-scope="world"]'); if (b) b.click(); setTimeout(r, 400); })`); await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-action="explore-region"][data-region="extras"]'); if (b) b.click(); setTimeout(r, 400); })`); await evalJs(ws, `new Promise((r) => { const b = document.querySelector('#explore-list .item'); if (b) b.click(); setTimeout(r, 400); })`); }
     if (name === "map" && sub === "dist") await evalJs(ws, `new Promise((r) => { const b = document.querySelector('[data-action="map-level"][data-level="dist"]'); if (b) b.click(); setTimeout(r, 600); })`);
     await sleep(900);
     const shot = await send(ws, "Page.captureScreenshot", { format: "png" });

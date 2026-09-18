@@ -105,6 +105,27 @@ const unMembers = countries
     };
   });
 
+// v2.1: the 56 non-UN entities in the dataset — territories, dependencies and
+// a few independent-but-not-UN places (Kosovo, Taiwan, Palestine, Western
+// Sahara). Explore-only ("Territories & others"); never asked in a quiz.
+const extras = countries
+  .filter((c) => !c.unMember)
+  .sort((a, b) => a.name.common.localeCompare(b.name.common))
+  .map((c) => {
+    const bn = COUNTRY_BN[c.cca3];
+    return {
+      id: "x-" + c.cca2.toLowerCase(),
+      iso2: c.cca2, iso3: c.cca3,
+      en: c.name.common, official: c.name.official || c.name.common,
+      bn: (bn && bn[1]) || c.name.common,
+      capitalEn: (c.capital && c.capital[0]) || "",
+      region: c.region, regionBn: REGION_BN[c.region] || c.region, subRegion: c.subregion || c.region,
+      area: c.area || 0,
+      flagCode: c.cca2.toLowerCase(),
+      status: c.independent ? "independent" : "territory",
+    };
+  });
+
 const divisions = DIVISIONS.map((d) => ({
   ...d,
   photo: photos[d.id] || null,
@@ -150,6 +171,7 @@ export const GEO={
     }))
   )},
   countries:${JSON.stringify(unMembers)},
+  extras:${JSON.stringify(extras)},
   divisions:${JSON.stringify(divisions, null, 0)},
   districts:${JSON.stringify(districts, null, 0)},
   bdLabels:${JSON.stringify(bdLabels)},
@@ -160,4 +182,4 @@ export const GEO={
 `;
 
 fs.writeFileSync(path.join(root, "geo-data.js"), geoData);
-console.log(`geo-data.js: ${unMembers.length} countries, ${divisions.length} divisions, ${districts.length} districts, ${worldMapKeys.length} map paths`);
+console.log(`geo-data.js: ${unMembers.length} countries, ${extras.length} extras, ${divisions.length} divisions, ${districts.length} districts, ${worldMapKeys.length} map paths`);

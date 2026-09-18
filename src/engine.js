@@ -9,6 +9,7 @@ const DIVS = GEO.divisions; // 8 divisions
 const CTRY = GEO.countries; // 194 countries
 const REGIONS = GEO.regions; // 5 regions
 const DISTS = GEO.districts; // 64 districts
+const EXTRAS = GEO.extras || []; // v2.1: territories & non-UN places (Explore only)
 const NATIONAL = GEO.national;
 
 const BD_MAP = window.BD_MAP || {};
@@ -71,7 +72,7 @@ const L = {
     newProfile: "New player",
     addName: "What's the player's name?",
     pickAvatar: "Pick an avatar",
-    start: "Start", create: "Create", cancel: "Cancel",
+    start: "Start", create: "Create", cancel: "Cancel", close: "Close",
     "wrong.try": "Try again", "wrong.next": "Nice try",
     correct: "Correct!", wrong: "Oops!",
     score: "Score", answered: "Answered", best: "Best",
@@ -102,6 +103,8 @@ const L = {
     learned: "You got these right:", xpGained: "+{n} XP", levelUpTitle: "Level {n}!",
     "map.hint.world": "Tap a country to explore",
     mapCountBD: "{d} divisions · {z} districts", mapCountWorld: "{c} countries on the map",
+    extrasChip: "Territories & others", extrasNote: "{n} places that are not UN member countries — islands, territories and special regions. Just for exploring; they never come up in quizzes.",
+    extraTerritory: "Territory or dependency", extraIndependent: "Independent, not a UN member", partOf: "Region",
     "map.hint.quiz": "Tap the correct place on the map",
     back: "Back",
     search: "Search…",
@@ -195,7 +198,7 @@ const L = {
     newProfile: "নতুন খেলোয়াড়",
     addName: "খেলোয়াড়ের নাম কী?",
     pickAvatar: "ছবি বেছে নাও",
-    start: "শুরু", create: "তৈরি", cancel: "বাতিল",
+    start: "শুরু", create: "তৈরি", cancel: "বাতিল", close: "বন্ধ",
     "wrong.try": "আবার চেষ্টা", "wrong.next": "ঠিক আছে",
     correct: "সঠিক!", wrong: "উফ!",
     score: "স্কোর", answered: "উত্তর", best: "সেরা",
@@ -226,6 +229,8 @@ const L = {
     learned: "এগুলো ঠিক হয়েছে:", xpGained: "+{n} XP", levelUpTitle: "স্তর {n}!",
     "map.hint.world": "দেশে স্পর্শ করো",
     mapCountBD: "{d}টি বিভাগ · {z}টি জেলা", mapCountWorld: "মানচিত্রে {c}টি দেশ",
+    extrasChip: "অঞ্চল ও অন্যান্য", extrasNote: "{n}টি জায়গা যারা জাতিসংঘের সদস্য দেশ নয় — দ্বীপ, অঞ্চল ও বিশেষ এলাকা। শুধু ঘুরে দেখার জন্য; কুইজে আসবে না।",
+    extraTerritory: "অঞ্চল বা অধীনস্থ এলাকা", extraIndependent: "স্বাধীন, জাতিসংঘের সদস্য নয়", partOf: "অঞ্চল",
     "map.hint.quiz": "সঠিক স্থানে স্পর্শ করো",
     back: "ফিরে যাও",
     search: "খোঁজো…",
@@ -1000,7 +1005,8 @@ function screenExplore(params = {}) {
       <button class="fchip ${favF ? "on" : ""}" data-action="explore-fav" data-fav="1">⭐ ${t("favorites")}</button>
       ${scope === "world"
         ? `<button class="fchip ${regionF === "all" ? "on" : ""}" data-action="explore-region" data-region="all">${t("regionAll")}</button>
-           ${REGIONS.map((r) => `<button class="fchip ${regionF === r.id ? "on" : ""}" data-action="explore-region" data-region="${r.id}">${_lang === "bn" ? r.bn : r.en}</button>`).join("")}`
+           ${REGIONS.map((r) => `<button class="fchip ${regionF === r.id ? "on" : ""}" data-action="explore-region" data-region="${r.id}">${_lang === "bn" ? r.bn : r.en}</button>`).join("")}
+           <button class="fchip ${regionF === "extras" ? "on" : ""}" data-action="explore-region" data-region="extras">🏝️ ${t("extrasChip")}</button>`
         : bdDivChips}
     </div>
     <div id="explore-list"></div>`);
@@ -1029,6 +1035,12 @@ MOUNT.explore = (params = {}) => {
         nm: name(d), sb: `${d.districts} ${t("districts")} · ${t("hq")}: ${_lang === "bn" ? d.hqBn : d.hq}`, st: starShown(p, "d", d.id),
         open: () => go("detail", { kind: "div", id: d.id }),
       }));
+    } else if (regionF === "extras") {
+      items = EXTRAS.map((x) => ({
+        key: "x|" + x.id, kind: "x", id: x.id, img: flagUrl(x.flagCode), ring: null,
+        nm: _lang === "bn" ? x.bn : x.en, sb: `${regionBn(x.region)}${x.capitalEn ? " · " + x.capitalEn : ""}`, st: "",
+        open: () => openExtraModal(x),
+      }));
     } else {
       items = CTRY.filter((c) => regionF === "all" || c.region.toLowerCase() === regionF)
         .map((c) => ({
@@ -1040,6 +1052,11 @@ MOUNT.explore = (params = {}) => {
     }
     if (favF) items = items.filter((it) => isFav(p, it.kind, it.id));
     if (q) items = items.filter((it) => it.nm.toLowerCase().includes(q));
+    if (scope === "world" && regionF === "extras" && !q) {
+      list.innerHTML = `<div class="card" style="padding:10px 14px;color:var(--ink-soft);font-size:14px">${tvar("extrasNote", { n: EXTRAS.length })}</div>` + shellRows(items);
+      list.querySelectorAll(".item").forEach((row, i) => row.addEventListener("click", (e) => { if (!e.target.closest("[data-fav]")) items[i].open(); }));
+      return;
+    }
     if (scope === "world" && !favF && !q && regionF === "all") {
       list.innerHTML = `<div class="card" style="padding:10px 14px;color:var(--ink-soft);font-size:14px">${t("worldCount", { n: items.length })}</div>`;
       list.innerHTML += shellRows(items);
@@ -2920,6 +2937,26 @@ document.addEventListener("click", (e) => {
     back();
   }
 });
+/* v2.1: a territory / non-UN place — light modal, no detail screen or quiz */
+function openExtraModal(x) {
+  const dlg = html(`<div class="modal-bg">
+    <div class="modal extra-modal">
+      <img class="extra-flag" src="${flagUrl(x.flagCode)}" alt="">
+      <h3>${_lang === "bn" ? x.bn : x.en}</h3>
+      ${x.official && x.official !== x.en ? `<p class="ds">${x.official}</p>` : ""}
+      <p class="extra-status">${x.status === "independent" ? t("extraIndependent") : t("extraTerritory")}</p>
+      <div class="stat-grid">
+        ${x.capitalEn ? `<div class="stat"><b>${x.capitalEn}</b><small>${t("capital")}</small></div>` : ""}
+        <div class="stat"><b>${regionBn(x.region)}</b><small>${t("partOf")}</small></div>
+        ${x.area ? `<div class="stat"><b>${fmtNum(Math.round(x.area))} km²</b><small>${t("area")}</small></div>` : ""}
+        <div class="stat"><b>${x.subRegion}</b><small>${t("subRegion")}</small></div>
+      </div>
+      <div class="btn-row"><button class="btn btn-paper" data-close>✕ ${t("close")}</button></div>
+    </div></div>`).firstElementChild;
+  document.body.appendChild(dlg);
+  dlg.querySelector("[data-close]").addEventListener("click", () => dlg.remove());
+  dlg.addEventListener("click", (e) => { if (e.target.classList.contains("modal-bg")) dlg.remove(); });
+}
 function openNameModal() {
   const p = profile();
   const dlg = html(`<div class="modal-bg">
@@ -3020,4 +3057,4 @@ function boot() {
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { mascot, journeyNodes, nodeStars, childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };
+export const __test = { EXTRAS, mascot, journeyNodes, nodeStars, childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };

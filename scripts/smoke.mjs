@@ -208,6 +208,10 @@ assert(T.APP_LOCKED === false, "app starts unlocked");
   assert(lakes.length >= 10, "lakes layer present");
   assert(text.some((x) => x.en === "Bay of Bengal" && x.bn) && text.filter((x) => x.kind === "continent").length === 7, "ocean + 7 continent labels, bilingual");
 }
+// v2.1: territories & full flag set
+assert(T.EXTRAS.length >= 50 && T.EXTRAS.every((x) => x.id.startsWith("x-") && x.flagCode && x.en && x.bn && x.region), "extras present with flags");
+assert(T.EXTRAS.some((x) => x.iso2 === "PS") && T.EXTRAS.some((x) => x.iso2 === "TW") && T.EXTRAS.some((x) => x.iso2 === "HK"), "extras include Palestine, Taiwan, Hong Kong");
+assert(!GEO.countries.some((c) => c.id.startsWith("x-")), "extras never leak into the country list");
 // v2.0: mascot + journey
 for (const m of ["happy", "wow", "sad", "think", "sleepy"]) assert(T.mascot(m, 40).startsWith("<svg") && T.mascot(m, 40).includes('width="40"'), "mascot " + m + " renders svg");
 const jn = T.journeyNodes();
