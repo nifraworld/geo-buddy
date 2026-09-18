@@ -91,7 +91,7 @@ geo.nifraworld.com root
     (`admin-tools/`, git-ignored). Keys: `GB-XXXX-XXXX` (bundle) / `GB-BD-`·`GB-WR-`;
     teacher code `TP-XXXX-XXXX`.
   - Pages Functions: `/api/activate`, `/api/licence`, `/api/keys` (gated by `REVIEW_KEY`),
-    D1 schema (`plans`, `devices`), `SETUP.md`, `licences.json` manifest.
+    D1 schema (`plans`, `devices`), `SETUP.md`. (`licences.json` removed in v2.0 — unused.)
   - Parent-zone "Licence" card (activate/remove), status shown, offline refresh on launch.
   - App currently runs fully open (`APP_LOCKED = false`); flipping it starts enforcing keys.
   - Remaining (when selling starts): D1 + secrets in Cloudflare (dashboard steps in
@@ -200,6 +200,26 @@ geo.nifraworld.com root
     screen (honeypot, optional email).
   - Note: the Bash tool used in these sessions collapses `\` in heredocs — write
     scripts to files (Write tool) when the payload contains escapes.
+- **V2.0** Character + journey (Duolingo-style engagement). ✅
+  - **Bagha the tiger cub** mascot: inline SVG (offline, any size), moods happy / wow /
+    sad / think / sleepy. Replaces the icon on Welcome, sits in the Home hero with a
+    speech-bubble tip (daily challenge → due reviews → weak spot → explore), reacts to
+    every answer in the quiz header, stars the Results screen, fills empty states
+    (no profiles, no badges).
+  - **Journey** tab: a winding path of learn decks — Bangladesh divisions → districts of
+    each division → countries of each region. Each stop opens its flip-card deck; the
+    "Quiz me" session scores the stop (≥50/70/90% → 1/2/3 stars, gold ring at 3) and a
+    star unlocks the next stop. Stored per profile in `p.journey[nodeId]` (best %).
+    Header shows stars earned / total; auto-scrolls to the current stop.
+  - **Bottom nav** (Home · Journey · Play · Explore · Map) on every child screen, fixed,
+    safe-area aware; tapping resets the stack so Back always lands on Home.
+  - **Combo**: consecutive correct answers show 🔥 ×N in the quiz header; every 3rd in a
+    row banks +5 bonus XP (`p.bonusXP`, counted by `getXP`). Floating "+10 XP" on each
+    correct answer.
+  - First launch: picking a language creates the first profile and opens the name box
+    straight away (one screen fewer before playing).
+  - Removed the unused `licences.json` manifest. Smoke test covers mascot, journey
+    nodes/stars and bonus XP.
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.

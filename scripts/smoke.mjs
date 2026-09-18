@@ -198,5 +198,14 @@ assert(typeof T.licenceLabel() === "string" && T.licenceLabel().length > 0, "lic
 assert(Array.isArray(T.LICENCE_SCOPES) && T.LICENCE_SCOPES.length === 2, "uscopes bd+wr");
 assert(T.APP_LOCKED === false, "app starts unlocked");
 
+// v2.0: mascot + journey
+for (const m of ["happy", "wow", "sad", "think", "sleepy"]) assert(T.mascot(m, 40).startsWith("<svg") && T.mascot(m, 40).includes('width="40"'), "mascot " + m + " renders svg");
+const jn = T.journeyNodes();
+assert(jn.length === 1 + 8 + 5 && jn[0].id === "div:" && jn.every((n) => n.label && !looksRaw(n.label)), "journey: divisions + 8 district decks + 5 regions, human labels");
+assert(T.nodeStars({}, "div:") === 0 && T.nodeStars({ journey: { "div:": 49 } }, "div:") === 0, "journey: <50% no star");
+assert(T.nodeStars({ journey: { "div:": 50 } }, "div:") === 1 && T.nodeStars({ journey: { "div:": 70 } }, "div:") === 2 && T.nodeStars({ journey: { "div:": 90 } }, "div:") === 3, "journey: 50/70/90 -> 1/2/3 stars");
+const xpP = { stats: { correct: 3 }, bonusXP: 5 };
+assert(T.getXP(xpP) === 35, "combo bonus XP counts toward level");
+
 console.log(failures ? failures + " FAILURES" : "SMOKE OK");
 process.exit(failures ? 1 : 0);

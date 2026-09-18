@@ -50,7 +50,9 @@ const L = {
     "welcome.start": "Start exploring",
     langSwitch: "বাংলা",
     hello: "Hello", helloDone: "Great job",
-    navHome: "Home", navPlay: "Play", navExplore: "Explore", navParent: "Parents", navMap: "Map",
+    navHome: "Home", navPlay: "Play", navExplore: "Explore", navParent: "Parents", navMap: "Map", navJourney: "Journey",
+    journeyStars: "{n} of {total} stars", journeyHint: "Earn a star on each stop to open the next one",
+    tipDaily: "Today's challenge is waiting!", tipWeak: "Let's fix a weak spot today!", tipExplore: "Let's explore somewhere new!",
     explore: "Explore", exploreSub: "Browse divisions & countries, see photos and fun facts",
     play: "Play", playSub: "Quizzes, flags, find-on-map & daily challenge",
     map: "Map Explorer", mapSub: "Tap divisions and countries on the map",
@@ -136,7 +138,7 @@ const L = {
     pinUnlocked: "Parent zone",
     settings: "Settings", langLock: "Lock the language", langLockSub: "Keep English or Bangla fixed",
     clearData: "Erase all progress", clearDataSub: "Remove profiles, stars and stats",
-    confirmClear: "Really erase everything?", export: "Backup (download JSON)",
+    confirmClear: "Really erase everything?", export: "Save a backup file",
     exportSub: "Save your child's progress as a file", exportDone: "Backup downloaded",
     about: "About & sources", aboutSub: "Data sources and credits",
     profileStats: "Progress", totalAsked: "Questions asked", totalCorrect: "Correct answers",
@@ -169,7 +171,9 @@ const L = {
     "welcome.start": "শুরু করি",
     langSwitch: "English",
     hello: "নমস্কার", helloDone: "দারুণ!",
-    navHome: "হোম", navPlay: "খেলা", navExplore: "ঘুরে দেখি", navParent: "অভিভাবক", navMap: "মানচিত্র",
+    navHome: "হোম", navPlay: "খেলা", navExplore: "ঘুরে দেখি", navParent: "অভিভাবক", navMap: "মানচিত্র", navJourney: "যাত্রা",
+    journeyStars: "{total}টির মধ্যে {n} তারা", journeyHint: "প্রতিটি ধাপে একটি তারা পেলে পরেরটি খুলবে",
+    tipDaily: "আজকের চ্যালেঞ্জ অপেক্ষা করছে!", tipWeak: "চলো আজ একটা দুর্বল জায়গা ঠিক করি!", tipExplore: "চলো নতুন কোথাও ঘুরে আসি!",
     explore: "ঘুরে দেখি", exploreSub: "বিভাগ ও দেশ ঘুরে দেখো, ছবি এবং মজার তথ্য",
     play: "খেলা", playSub: "কুইজ, পতাকা, মানচিত্র ও দৈনিক চ্যালেঞ্জ",
     map: "মানচিত্র", mapSub: "মানচিত্রে বিভাগ ও দেশ স্পর্শ করো",
@@ -256,7 +260,7 @@ const L = {
     settings: "সেটিংস", langLock: "ভাষা আটকে রাখো", langLockSub: "শিশুর সামনে ভাষা বদল বন্ধ",
     clearData: "সব মুছে ফেলো", clearDataSub: "প্রোফাইল, তারা ও স্কোর মুছে যাবে",
     confirmClear: "সত্যিই সব মুছে ফেলব?",
-    export: "ব্যাকআপ নাও", exportSub: "অগ্রগতি একটি ফাইলে সংরক্ষণ",
+    export: "ব্যাকআপ ফাইল সংরক্ষণ", exportSub: "অগ্রগতি একটি ফাইলে সংরক্ষণ",
     exportDone: "ব্যাকআপ নেওয়া হয়েছে",
     about: "তথ্যসূত্র", aboutSub: "তথ্যের উৎস ও কৃতিত্ব",
     profileStats: "অগ্রগতি", totalAsked: "মোট প্রশ্ন", totalCorrect: "সঠিক উত্তর",
@@ -668,7 +672,7 @@ function checkBadges(p) {
   }
   return newBadges;
 }
-function getXP(p) { return (p.stats.correct || 0) * 10; }
+function getXP(p) { return (p.stats.correct || 0) * 10 + (p.bonusXP || 0); }
 function levelForXP(xp) { let lv = 1; while (xp >= lv * lv * 50) lv++; return lv; }
 /* the unearned badge the child is closest to, with its progress */
 function nextBadge(p) {
@@ -706,6 +710,39 @@ function suggestPractice(p) {
 }
 function getLevel(p) { const xp = getXP(p); let lv = 1; while (xp >= lv * lv * 50) lv++; return lv; }
 function xpForNext(p) { const lv = getLevel(p); return lv * lv * 50; }
+
+/* ================= mascot: Bagha the tiger cub =================
+   Inline SVG so it works offline and scales anywhere. Moods: happy, wow,
+   sad, think, sleepy. */
+function mascot(mood = "happy", size = 96, cls = "") {
+  const eyes = {
+    happy: `<path d="M34 46q5-6 10 0" class="ln"/><path d="M56 46q5-6 10 0" class="ln"/>`,
+    wow:   `<circle cx="39" cy="45" r="5.5" fill="#1B1B1B"/><circle cx="61" cy="45" r="5.5" fill="#1B1B1B"/><circle cx="41" cy="43" r="1.8" fill="#fff"/><circle cx="63" cy="43" r="1.8" fill="#fff"/>`,
+    sad:   `<circle cx="39" cy="46" r="4" fill="#1B1B1B"/><circle cx="61" cy="46" r="4" fill="#1B1B1B"/><path d="M32 38l10 4M68 38l-10 4" class="ln"/>`,
+    think: `<circle cx="39" cy="46" r="4" fill="#1B1B1B"/><path d="M56 46q5-4 10 0" class="ln"/><path d="M54 37l12-3" class="ln"/>`,
+    sleepy:`<path d="M34 47q5 3 10 0" class="ln"/><path d="M56 47q5 3 10 0" class="ln"/>`,
+  }[mood] || "";
+  const mouth = {
+    happy: `<path d="M42 62q8 8 16 0" class="ln"/>`,
+    wow:   `<ellipse cx="50" cy="64" rx="5" ry="6.5" fill="#1B1B1B"/><ellipse cx="50" cy="62" rx="3" ry="2" fill="#F48FB1"/>`,
+    sad:   `<path d="M42 66q8-7 16 0" class="ln"/><ellipse cx="70" cy="56" rx="2.2" ry="3.5" fill="#7FC8F8"/>`,
+    think: `<path d="M44 63h12" class="ln"/>`,
+    sleepy:`<ellipse cx="50" cy="63" rx="4" ry="2.5" fill="#1B1B1B"/><text x="72" y="30" font-size="12" font-weight="800" fill="#1B1B1B">z</text>`,
+  }[mood] || "";
+  return `<svg class="mascot ${cls}" viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">
+    <style>.ln{fill:none;stroke:#1B1B1B;stroke-width:3;stroke-linecap:round}</style>
+    <ellipse cx="22" cy="24" rx="12" ry="12" fill="#F28C1E"/><ellipse cx="78" cy="24" rx="12" ry="12" fill="#F28C1E"/>
+    <ellipse cx="22" cy="25" rx="6.5" ry="6.5" fill="#F9C0C6"/><ellipse cx="78" cy="25" rx="6.5" ry="6.5" fill="#F9C0C6"/>
+    <circle cx="50" cy="52" r="36" fill="#F7A23B"/>
+    <path d="M40 18l4 12M50 15v12M60 18l-4 12" class="ln" stroke="#2B1B0E" stroke-width="4"/>
+    <path d="M17 50l10 3M17 58l10-1M83 50l-10 3M83 58l-10-1" class="ln" stroke="#2B1B0E" stroke-width="3.5"/>
+    <ellipse cx="50" cy="63" rx="17" ry="12" fill="#FFF3E0"/>
+    <circle cx="36" cy="54" r="5" fill="#F9C0C6" opacity=".7"/><circle cx="64" cy="54" r="5" fill="#F9C0C6" opacity=".7"/>
+    ${eyes}
+    <path d="M45 56q5-4 10 0q-2 5-5 5q-3 0-5-5z" fill="#1B1B1B"/>
+    ${mouth}
+  </svg>`;
+}
 
 /* ================= feedback ================= */
 function toast(msg) {
@@ -796,7 +833,7 @@ function render(name, params) {
     explore: screenExplore, detail: screenDetail, map: screenMap,
     play: screenPlay, session: screenSession, results: screenResults,
     daily: screenDaily, parent: screenParent, pin: screenPin, about: screenAbout,
-    custom: screenCustom, clock: screenClock, learn: screenLearn, cards: screenCards, class: screenClass,
+    custom: screenCustom, clock: screenClock, learn: screenLearn, cards: screenCards, class: screenClass, journey: screenJourney,
   }[name];
   // leaving the quiz screen abandons the session: its answer/next timers must
   // not append the next question onto whatever screen is shown now
@@ -804,7 +841,12 @@ function render(name, params) {
   const top = name === "welcome" || name === "pin" ? `<div class="site-tag-float">${siteTag()}</div>` : fillTopbar(name !== "who");
   document.title = name === "map" ? "Map — Geo Buddy" : "Geo Buddy";
   const node = sub(params);
-  APP.innerHTML = top + `<div class="screen-in">${htmlStr(node)}</div>`;
+  const navFor = { home: "home", journey: "journey", learn: "journey", cards: "journey", play: "play", custom: "play", daily: "play", clock: "play", results: "play",
+    explore: "explore", detail: "explore", map: "map", parent: "home", about: "home", class: "home" }[name];
+  const nav = navFor && profile() ? `<nav class="bnav">${[
+    ["home", "🏠", t("navHome")], ["journey", "🗺️", t("navJourney")], ["play", "🎯", t("navPlay")], ["explore", "📚", t("navExplore")], ["map", "🧭", t("navMap")],
+  ].map(([id, ic, lb]) => `<button class="${navFor === id ? "on" : ""}" data-bnav="${id}"><span class="ic">${ic}</span><span class="lb">${lb}</span></button>`).join("")}</nav>` : "";
+  APP.innerHTML = top + `<div class="screen-in">${htmlStr(node)}</div>` + nav;
   window.scrollTo(0, 0);
   const hook = MOUNT[name];
   if (hook) hook(params);
@@ -816,7 +858,7 @@ const MOUNT = {};
 function screenWelcome() {
   return html(`
     <section class="welcome">
-      <img class="hero" src="assets/icons/icon-512.png" alt="Geo Buddy">
+      <div class="hero-mascot">${mascot("happy", 150, "bob")}</div>
       <h1>Geo Buddy</h1>
       <p class="tag">${t("tagline")}</p>
       <div class="langp">
@@ -840,7 +882,7 @@ function screenWho() {
         <small>${p.stats.correct}/${p.stats.asked} ✓ · 🔥${p.daily.streak}</small>
         <span class="stars">${Array(3).fill("★").slice(0, 3).join("")}</span>
       </button>`).join("")
-    : `<div class="card">${t("noProfilesYet")}</div>`;
+    : `<div class="empty">${mascot("think", 80)}<p>${t("noProfilesYet")}</p></div>`;
   return html(`
     <h2 class="sec-title" style="margin-top:16px"><span>${t("profile")}</span></h2>
     <div class="who-grid">
@@ -865,11 +907,15 @@ function screenHome() {
   const sug = suggestPractice(act);
   const st = areaStats(act);
   const played = st.d.a + st.z.a + st.c.a > 0;
+  const due = dueCount(act);
+  const tip = !doneToday ? t("tipDaily") : due ? tvar("dueToday", { n: due }) : sug.weak ? t("tipWeak") : t("tipExplore");
+  const mood = !doneToday ? "wow" : streak >= 3 ? "happy" : "think";
   return html(`
     <div class="home-hero">
-      <span class="avatar" style="background:${act.avatar.color}">${act.avatar.icon}</span>
+      <div class="hero-mascot-sm">${mascot(mood, 72, "bob")}</div>
       <div class="hero-txt">
         <div class="greet">${greet}, ${act.name.split(" ")[0]}! 👋</div>
+        <div class="bubble">${tip}</div>
         <div class="xp-row"><span class="lv-pill">${t("level")} ${lv}</span><span class="xp-bar"><i style="width:${xpPct}%"></i></span><small>${xp - lvStart}/${lvEnd - lvStart} XP</small></div>
       </div>
       <div class="streak"><b>🔥${streak}</b><small>${t("streakFlame")}</small></div>
@@ -897,9 +943,9 @@ function screenHome() {
     </div>
 
     <div class="mode-grid three">
+      <button class="mode-card" data-nav="journey"><div class="em">🗺️</div><div class="tt">${t("navJourney")}</div></button>
       <button class="mode-card" data-nav="play"><div class="em">🎯</div><div class="tt">${t("play")}</div></button>
-      <button class="mode-card" data-nav="explore"><div class="em">🗺️</div><div class="tt">${t("explore")}</div></button>
-      <button class="mode-card" data-nav="map"><div class="em">🧭</div><div class="tt">${t("navMap")}</div></button>
+      <button class="mode-card" data-nav="explore"><div class="em">📚</div><div class="tt">${t("explore")}</div></button>
     </div>
     <button class="mode-card pin wide" data-nav="parent"><span class="em">🔒</span><span><span class="tt">${t("parentZone")}</span><span class="ds">${t("pinTitle")}</span></span></button>
     <p class="foot">geobuddy.nifraworld.com · v${GEO.version || ""}</p>`);
@@ -1253,6 +1299,43 @@ MOUNT.custom = (p) => {
   });
 };
 
+/* ---------- journey: the path of decks ---------- */
+function journeyNodes() {
+  const nodes = [{ id: "div:", kind: "div", key: "", icon: "🗺️", label: t("deckDivisions"), color: "var(--brand)" }];
+  for (const d of DIVS) nodes.push({ id: "dist:" + d.id, kind: "dist", key: d.id, icon: "🧩", label: tvar("deckDistrictsOf", { X: name(d) }), color: DIV_PALETTE[d.id] });
+  for (const r of REGIONS) nodes.push({ id: "region:" + r.id, kind: "region", key: r.id, icon: "🌍", label: tvar("deckRegion", { X: _lang === "bn" ? r.bn : r.en }), color: "var(--info)" });
+  return nodes;
+}
+function nodeStars(p, id) { const pct = (p.journey || {})[id]; return pct == null ? 0 : pct >= 90 ? 3 : pct >= 70 ? 2 : pct >= 50 ? 1 : 0; }
+function screenJourney() {
+  const p = profile();
+  const nodes = journeyNodes();
+  let unlocked = true;
+  const rows = nodes.map((n, i) => {
+    const st = nodeStars(p, n.id);
+    const open = unlocked;
+    const done = st >= 1;
+    unlocked = done; // next node opens once this one has a star
+    const side = i % 2 ? "r" : "l";
+    return `<div class="jn ${side} ${open ? "" : "locked"} ${st === 3 ? "gold" : ""}">
+      <button class="jn-btn" data-action="jn" data-kind="${n.kind}" data-key="${n.key}" ${open ? "" : "disabled"} style="--c:${n.color}">
+        <span class="jn-ico">${open ? n.icon : "🔒"}</span>
+      </button>
+      <div class="jn-txt"><b>${n.label}</b><span class="stars">${"★".repeat(st)}${"☆".repeat(3 - st)}</span></div>
+    </div>`;
+  }).join("");
+  const total = nodes.reduce((sum, n) => sum + nodeStars(p, n.id), 0);
+  return html(`
+    <div class="journey-head">${mascot(total ? "happy" : "wow", 64)}<div><b>${t("navJourney")}</b><small>${tvar("journeyStars", { n: total, total: nodes.length * 3 })}</small><div class="g-bar"><i style="width:${Math.round(total / (nodes.length * 3) * 100)}%"></i></div></div></div>
+    <p class="ds" style="margin:6px 4px 0">${t("journeyHint")}</p>
+    <div class="journey">${rows}</div>`);
+}
+MOUNT.journey = () => {
+  bindAction(APP, "jn", (e, btn) => go("cards", { kind: btn.getAttribute("data-kind"), key: btn.getAttribute("data-key") || "", i: 0 }));
+  const first = APP.querySelector(".jn:not(.locked):not(.gold)");
+  if (first) setTimeout(() => first.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
+};
+
 /* ---------- learn mode: flip-card decks ---------- */
 function deckFor(kind, key) {
   // returns { title, scope, types, items:[{id, ent, name, speak, sub, back, fact, flag?, color?}] }
@@ -1364,7 +1447,7 @@ MOUNT.cards = (params = {}) => {
     const items = new Set(deck.items.map((x) => String(x.id)));
     const qs = buildQuestionList({ scope: deck.scope, types: deck.types, count: Math.min(10, Math.max(5, deck.items.length)), adaptive: true, items });
     if (!qs.length) { toast("…"); return; }
-    startSession({ title: deck.title, questions: qs, clock: false, daily: false });
+    startSession({ title: deck.title, questions: qs, clock: false, daily: false, nodeId: params.kind + ":" + (params.key || "") });
   });
 };
 
@@ -1669,7 +1752,25 @@ function qBar(s) {
   return `<div class="q-progress"><i style="width:${Math.min(100, pct)}%"></i></div>`;
 }
 function qHead(s) {
-  return `<div class="q-top"><b>${t("score")}:</b> <span class="q-score">${s.correct} ✓</span><span style="opacity:.6">· ${s.answered}</span></div>`;
+  const combo = s.combo || 0;
+  return `<div class="q-top">
+    <span class="q-mascot" data-qmascot>${mascot(combo >= 3 ? "wow" : "happy", 40)}</span>
+    <span class="q-score">${s.correct} ✓</span><span style="opacity:.6">· ${s.answered}/${s.conf.questions.length || "∞"}</span>
+    <span class="combo ${combo >= 2 ? "on" : ""}" data-combo>${combo >= 2 ? "🔥 ×" + combo : ""}</span>
+  </div>`;
+}
+/* floating "+10 XP" near the score, mascot reaction */
+function xpFloat(s, ok) {
+  const m = APP.querySelector("[data-qmascot]");
+  if (m) m.innerHTML = mascot(ok ? (s.combo >= 3 ? "wow" : "happy") : "sad", 40);
+  const c = APP.querySelector("[data-combo]");
+  if (c) { c.textContent = s.combo >= 2 ? "🔥 ×" + s.combo : ""; c.classList.toggle("on", s.combo >= 2); }
+  if (!ok) return;
+  const anchor = APP.querySelector(".q-score");
+  if (!anchor) return;
+  const el = html(`<span class="xp-float">+10 XP${s.comboBonus ? " +5 🔥" : ""}</span>`).firstElementChild;
+  anchor.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
 }
 function textQuestionHTML(s, q, n) {
   return `
@@ -1756,8 +1857,9 @@ function answerSession(s, q, pick, spot, correctId) {
   if (s.answered > s.idx) return;
   s.answered = s.idx + 1;
   const ok = String(pick) === String(q.answerId);
-  if (ok) { s.correct++; s.right.push(q); }
-  else s.wrong.push(q);
+  if (ok) { s.correct++; s.right.push(q); s.combo = (s.combo || 0) + 1; }
+  else { s.wrong.push(q); s.combo = 0; }
+  if (ok && s.combo > 1 && s.combo % 3 === 0 && profile()) { profile().bonusXP = (profile().bonusXP || 0) + 5; s.comboBonus = true; } else s.comboBonus = false;
   s.lastPicked = pick; s.lastOK = ok;
   const p = profile();
   if (p) {
@@ -1766,6 +1868,7 @@ function answerSession(s, q, pick, spot, correctId) {
     save();
   }
   applyFeedback(q, ok, pick, spot);
+  xpFloat(s, ok);
   if (ok) sfx("correct"); else sfx("wrong");
   if (S.conf.clock && ok) { stopClockForNiceMoment(); }
   setTimeout(() => { if (s.over) return; s.idx++; showNext(s); }, ok ? (q.kind === "type" ? 1200 : 950) : (q.kind === "type" || q.explain ? 2400 : 1800));
@@ -1892,7 +1995,9 @@ function finish() {
     setTimeout(() => { sfx("levelUp"); toast(`⬆️ Level ${newLv}!`); confetti(); }, newBadges.length ? 2800 : 600);
   }
   if (result.wrong.length === total) speak(t("wrong"), _lang);
-  p.lastPlayed = todayKey(); save();
+  p.lastPlayed = todayKey();
+  if (s.conf.nodeId) { if (!p.journey) p.journey = {}; p.journey[s.conf.nodeId] = Math.max(p.journey[s.conf.nodeId] || 0, pct); result.nodeId = s.conf.nodeId; }
+  save();
   pushProgress(false);
   replace("results", result);
 }
@@ -1953,7 +2058,7 @@ function screenResults(params) {
   const retryAction = r.daily ? "retry-daily" : "retry-session";
   return html(`
     <div class="results">
-      <div class="big pop">${emoticon}</div>
+      <div class="big pop">${mascot(r.stars >= 3 ? "wow" : r.stars >= 1 ? "happy" : "sad", 120)}</div>
       <div class="stars-big">${[0, 1, 2].map((i) => `<span class="${i < r.stars ? "on" : ""}" style="animation-delay:${.25 + i * .22}s">${i < r.stars ? "★" : "☆"}</span>`).join("")}</div>
       <div class="score">${msg}</div>
       <div class="score-num">${r.correct}<span>/${r.total}</span> · ${r.pct}%</div>
@@ -1965,6 +2070,7 @@ function screenResults(params) {
       ${rightHTML}
       ${wrongHTML}
       <div class="btn-row" style="margin-top:16px">
+        ${r.nodeId ? `<button class="btn btn-sun" data-nav="journey">🗺️ ${t("navJourney")}</button>` : ""}
         <button class="btn btn-primary" data-action="${retryAction}">🔁 ${t("again")}</button>
         <button class="btn btn-paper" data-nav="home">🏠 ${t("home")}</button>
         ${shareBtn}
@@ -2592,7 +2698,7 @@ function screenParent() {
               const b = BADGES.find((x) => x.id === bid);
               return b ? `<span class="badge-sec" title="${b.descEn}">${b.icon} ${_lang === "bn" ? b.bn : b.en}</span>` : "";
             }).join("")
-          : `<span style="font-size:14px;color:var(--muted)">${t("badgeNone")}</span>`}
+          : `<span class="empty sm">${mascot("think", 56)}<span>${t("badgeNone")}</span></span>`}
       </div>
     </div>
     <div class="card">
@@ -2692,7 +2798,9 @@ document.addEventListener("click", (e) => {
   const a = act.getAttribute("data-action");
   if (a === "picklang") {
     _lang = act.getAttribute("data-lang");
-    D.lang = _lang; save(); toast(t("changedLang") + " ✓"); go("who");
+    D.lang = _lang; save();
+    if (!Object.keys(D.profiles).length) { newProfile("p" + Date.now().toString(36)); go("who"); openNameModal(); }
+    else go("who");
   } else if (a === "pick") {
     D.active = act.getAttribute("data-id"); save(); go("home");
   } else if (a === "newp") {
@@ -2757,6 +2865,17 @@ function openNameModal() {
   dlg.addEventListener("keydown", (e) => { if (e.key === "Enter") dlg.querySelector("#nm-ok").click(); });
   dlg.addEventListener("click", (e) => { if (e.target.classList.contains("modal-bg")) dlg.querySelector("[data-close]").click(); });
 }
+// bottom nav: jump straight there (fresh stack so back always lands on Home)
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-bnav]");
+  if (!b) return;
+  const where = b.getAttribute("data-bnav");
+  const cur = stack[stack.length - 1];
+  if (cur && cur.name === where) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+  sfx("tap");
+  stack.length = 0; stack.push({ name: "home", params: {} });
+  if (where === "home") render("home", {}); else go(where);
+});
 // lang button in topbar
 document.addEventListener("click", (e) => {
   const tb = e.target.closest("[data-tb=lang]");
@@ -2811,4 +2930,4 @@ function boot() {
 boot();
 
 // exported only for the build smoke test (scripts/smoke.mjs); harmless in the browser
-export const __test = { childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };
+export const __test = { mascot, journeyNodes, nodeStars, childSummary, sale, refreshSale, lockMark, typedMatches, normAnswer, bumpItem, srsWeight, dueCount, deckFor, entTypeOf, buildDailyQuestions, buildQuestionList, divQuestions, distQuestions, countryQuestions, fillChoices, shuffle, GEO, D, profile, t, _lang: () => _lang, go, render, back, newProfile, startSession, answerSession, SETUP, APP, boot, isFav: (type, id) => isFav(profile(), type, id), toggleFav: (type, id) => toggleFav(profile(), type, id), getLevel, getXP, BADGES, checkBadges, licence, licenceLabel, hasScope, deviceId, activateLicence, refreshLicence, clearLicence, LICENCE_SCOPES, APP_LOCKED, isLocked: () => APP_LOCKED, setLocked: (v) => { APP_LOCKED = !!v; } };
