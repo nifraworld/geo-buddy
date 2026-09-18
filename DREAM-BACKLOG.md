@@ -16,6 +16,17 @@ locked/paid phone is confirmed first.
 
 ---
 
+## ⏰ Owner to-do (things only you can do — Claude will ask again at each release)
+
+- [ ] **Bangla voice pack key** — create a Google Cloud project → enable *Cloud Text-to-Speech
+  API* → *Credentials → API key* → give it to Claude as `GOOGLE_TTS_KEY`. Then
+  `npm run audio` makes the 459 clips and the "Bangla voice" pack appears in Parent Zone.
+  Free tier covers it (~7,000 characters). Pipeline shipped in v2.2, waiting since 18 Sep 2026.
+- [ ] **Phone check of the district map** (label density, tint contrast) — pending since v1.3.
+- [ ] **`locked: true` in `sale.json`** when the free period should end.
+
+---
+
 ## 0. Where we are (so the dreams have a baseline)
 
 | Asset | Today | Gap |
