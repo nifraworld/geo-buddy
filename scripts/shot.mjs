@@ -41,6 +41,7 @@ try {
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((res, rej) => { ws.addEventListener("open", res); ws.addEventListener("error", rej); });
   await send(ws, "Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await send(ws, "Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: process.env.SHOT_DARK ? "dark" : "light" }] });
   await sleep(1500);
   // a profile so child screens render; the engine keeps the store in localStorage
   await evalJs(ws, `(() => { try { const k = Object.keys(localStorage).find((x) => /geo/i.test(x)); } catch {} return 1; })()`);

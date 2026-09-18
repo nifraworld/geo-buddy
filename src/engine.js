@@ -16,6 +16,7 @@ const BD_MAP = window.BD_MAP || {};
 const BD_LABELS = window.BD_LABELS || {};
 const BD_MAP_D = window.BD_MAP_D || {};
 const BD_LABELS_D = window.BD_LABELS_D || {};
+const BD_RIVERS = window.BD_RIVERS || []; // v2.1: Padma, Jamuna, Meghna, Teesta, Karnaphuli, Surma, Rupsha
 const WORLD_MAP = window.WORLD_MAP || {};
 const WORLD_LABELS = window.WORLD_LABELS || {};
 // v2.1 atlas layers (assets/world-map-data.js): marker dots for countries too
@@ -164,7 +165,7 @@ const L = {
     confirmDelProfile: "Delete this player?",
     justDeleted: "Player deleted", changedLang: "Language changed",
     photoCredits: "Photo: {a} · CC licensed · Wikimedia Commons",
-    dataSources: "Facts: mledoze/countries (ODbL) · Flags: lipis/flag-icons (MIT) · Photos: Wikimedia Commons · Bangladesh census: BBS 2022.",
+    dataSources: "Facts: mledoze/countries (ODbL) · Flags: lipis/flag-icons (MIT) · Maps, rivers & lakes: Natural Earth (public domain; borders drawn as they are on the ground, without taking sides in disputes) · Photos: Wikidata & Wikimedia Commons, credited on each page · Bangladesh census: BBS 2022 · Some Bangladesh river lines are simplified schoolbook courses.",
     made: "Made with ❤ for curious kids.",
     wrongList: "Review what you missed:", tryAgainBtn: "Practise mistakes",
     soundEff: "Sound effects", soundEffSub: "Correct, wrong & celebration sounds",
@@ -294,7 +295,7 @@ const L = {
     confirmDelProfile: "এই খেলোয়াড়টি মুছে ফেলব?",
     justDeleted: "খেলোয়াড় মুছে ফেলা হয়েছে", changedLang: "ভাষা বদলানো হয়েছে",
     photoCredits: "ছবি: {a} · CC লাইসেন্স · উইকিমিডিয়া কমন্স",
-    dataSources: "তথ্য: mledoze/countries (ODbL) · পতাকা: lipis/flag-icons (MIT) · ছবি: উইকিমিডিয়া কমন্স · আদমশুমারি: বিবিএস ২০২২।",
+    dataSources: "তথ্য: mledoze/countries (ODbL) · পতাকা: lipis/flag-icons (MIT) · মানচিত্র, নদী ও হ্রদ: Natural Earth (পাবলিক ডোমেইন; সীমানা বাস্তবে যেমন আছে তেমনই আঁকা, কোনো বিরোধে পক্ষ না নিয়ে) · ছবি: উইকিডেটা ও উইকিমিডিয়া কমন্স, প্রতিটি পাতায় কৃতিত্ব দেওয়া · আদমশুমারি: বিবিএস ২০২২ · বাংলাদেশের কিছু নদীরেখা পাঠ্যবইয়ের মতো সরলীকৃত।",
     made: "জিজ্ঞাসু বাচ্চাদের জন্য ভালোবাসা দিয়ে তৈরি।",
     wrongList: "ভুলগুলো আবার দেখে নিই:", tryAgainBtn: "ভুলগুলো অনুশীলন করি",
     soundEff: "সাউন্ড ইফেক্ট", soundEffSub: "সঠিক, ভুল ও উল্লাসের সাউন্ড",
@@ -2506,6 +2507,7 @@ function drawMap(canvas, md, opts = {}) {
     }
   }
   if (md.kind === "world") drawAtlasOver(ctx, canvas, md, v, opts);
+  else drawBDRivers(ctx, canvas, md, v, opts);
   if (opts.labels !== false) drawLabels(ctx, canvas, md, v, opts);
   // legend
   const legend = APP.querySelector(".map-legend");
@@ -2575,6 +2577,34 @@ function drawAtlasOver(ctx, canvas, md, v, opts) {
     ctx.fillText(label, tx.x, tx.y);
   }
 }
+/* rivers on the Bangladesh maps: thin blue lines, the three great rivers named
+   at the overview, the rest once zoomed in. Never drawn under a quiz answer. */
+let BD_RIVER_PATHS = null;
+function drawBDRivers(ctx, canvas, md, v, opts) {
+  if (!BD_RIVERS.length) return;
+  if (!BD_RIVER_PATHS) BD_RIVER_PATHS = BD_RIVERS.map((r) => { try { return new Path2D(r.d); } catch { return null; } });
+  const dark = isDark();
+  ctx.strokeStyle = dark ? "#8ED0F5" : "#2F7FB8";
+  ctx.lineWidth = Math.min(3.4, 2 + v.k * 0.3) / v.k;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.globalAlpha = 0.9;
+  BD_RIVER_PATHS.forEach((pth) => { if (pth) ctx.stroke(pth); });
+  ctx.globalAlpha = 1;
+  if (opts.interact === "none" && opts.target != null) return; // reveal state: keep it clean
+  const cssScale = (canvas.clientWidth || md.W) / md.W;
+  const px = (n) => n / (cssScale * v.k);
+  const big = new Set(["Padma", "Jamuna", "Meghna"]);
+  ctx.font = `italic 600 ${px(10)}px 'Noto Sans Bengali', sans-serif`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (const r of BD_RIVERS) {
+    if (!big.has(r.en) && v.k < 1.6) continue;
+    const label = _lang === "bn" ? r.bn : r.en;
+    ctx.lineWidth = px(3); ctx.strokeStyle = dark ? "rgba(15,29,24,.8)" : "rgba(255,255,255,.85)";
+    ctx.strokeText(label, r.lx, r.ly - px(7));
+    ctx.fillStyle = dark ? "#8CC4E8" : "#1F5F8B";
+    ctx.fillText(label, r.lx, r.ly - px(7));
+  }
+}
 /* Labels are sized in on-screen CSS px (not map units) so they stay readable
    at every zoom, and placed greedily biggest-first so none overlap; zooming
    in makes room for more. The quiz target is never labelled. */
@@ -2615,9 +2645,12 @@ function drawLabels(ctx, canvas, md, v, opts) {
   const hintTL = toPath(0, md.H - S(44)), hintBR = toPath(S(Math.min(cssW * 0.7, 260)), md.H);
   const placed = [[ctlTL[0], ctlTL[1], ctlBR[0], ctlBR[1]], [hintTL[0], hintTL[1], hintBR[0], hintBR[1]]];
   const minLand = md.kind === "world" ? 26 : 0; // CSS px of land needed before a country gets a label
+  // keep a label inside the visible canvas ("apai Nawabganj" used to be cut at the edge)
+  const [visL, visT] = toPath(0, 0), [visR, visB] = toPath(md.W, md.H);
   for (const c of cands) {
     if (c.wCss < minLand && md.kind === "world") continue;
     const w = ctx.measureText(c.txt).width, h = px(size) * 1.25;
+    if (md.kind !== "world") c.x = Math.min(Math.max(c.x, visL + w / 2 + px(4)), visR - w / 2 - px(4));
     const r = [c.x - w / 2 - px(3), c.y - h / 2, c.x + w / 2 + px(3), c.y + h / 2];
     if (placed.some((p) => r[0] < p[2] && r[2] > p[0] && r[1] < p[3] && r[3] > p[1])) continue;
     placed.push(r);

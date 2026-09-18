@@ -29,6 +29,10 @@ const SOURCES = {
     url: "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_lakes.geojson",
     desc: "Natural Earth 1:50m lakes. Public domain (Natural Earth).",
   },
+  "ne-rivers-10m.geojson": {
+    url: "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_rivers_lake_centerlines.geojson",
+    desc: "Natural Earth 1:10m rivers and lake centerlines — clipped to Bangladesh at build time. Public domain (Natural Earth).",
+  },
   "countries.json": {
     url: "https://raw.githubusercontent.com/mledoze/countries/master/dist/countries.json",
     desc: "Country facts (name, capital, region, ISO codes). Dataset (c) mledoze/countries, ODbL. Attribution shown in About.",

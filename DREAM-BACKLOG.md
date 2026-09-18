@@ -37,7 +37,7 @@ Every option below is free to use commercially and works offline once bundled.
 
 ### 1.1 Flags
 
-- `[idea]` ★ **Upgrade to full flag-icons set (≈ 260 flags)** — same library, same
+- `[done]` v2.1 ★ **Upgrade to full flag-icons set (≈ 260 flags)** — same library, same
   licence, adds territories + observers (Palestine, Vatican, Taiwan, Kosovo, Puerto
   Rico, Greenland, Hong Kong, Macau…). Needs a `status` field (UN member /
   observer / territory) so quizzes can stay "UN members only" by default and a
@@ -56,32 +56,32 @@ Every option below is free to use commercially and works offline once bundled.
 
 ### 1.2 World map
 
-- `[idea]` ★ **Natural Earth 1:50m instead of 1:110m** (public domain). Brings in almost
+- `[done]` v2.1 ★ **Natural Earth 1:50m instead of 1:110m** (public domain). Brings in almost
   all of the 29 missing countries (Singapore, Bahrain, Malta, Mauritius, Barbados…);
   Maldives/Tuvalu/Nauru remain dots → draw them as **tap-able circles with a label
   leader line** (the way school atlases do). Simplified with mapshaper to ≈ 450 KB.
   Keep 110m as the *quiz* base if 50m feels heavy on 360-px phones.
-- `[idea]` **Robinson (or Equal Earth) projection** — the "atlas look"; Greenland stops
+- `[done]` v2.1 (Equal Earth) **Robinson (or Equal Earth) projection** — the "atlas look"; Greenland stops
   being the size of Africa. d3-geo has both; only `maps.mjs` changes. (Parked since
   v1.4.1.)
-- `[idea]` **Oceans, continents and graticule layer** — Natural Earth `ocean`,
+- `[partial]` v2.1 (labels + graticule; no ocean polygons) **Oceans, continents and graticule layer** — Natural Earth `ocean`,
   `geographic_lines`, plus our own continent labels. Enables "Which continent?" and
   "Which ocean?" questions (see 3).
-- `[idea]` **Rivers & lakes layer** — Natural Earth `rivers_lake_centerlines` (PD) at
+- `[done]` v2.1 **Rivers & lakes layer** — Natural Earth `rivers_lake_centerlines` (PD) at
   50m: Nile, Amazon, Ganges/Padma, Brahmaputra/Jamuna, Yangtze… ≈ 120 KB.
 - `[idea]` **Mountains & deserts** as labelled points — Natural Earth
   `geography_regions_points` (PD) or a curated 60-item list from Wikidata.
 - `[idea]` **Shaded relief background** — Natural Earth raster (PD), 1 tile at
   1800×900 WebP ≈ 350 KB; toggle in Map Explorer. Pretty, optional.
-- `[idea]` **Country silhouettes** — free: derived from the map data we already have.
+- `[done]` v2.1 **Country silhouettes** — free: derived from the map data we already have.
   Powers a "Guess the country from its shape" mode (3).
-- `[blocked]` **Disputed borders policy** — Kashmir, Taiwan, Western Sahara, Crimea.
+- `[done]` v2.1 (Natural Earth de-facto borders, stated in About) **Disputed borders policy** — Kashmir, Taiwan, Western Sahara, Crimea.
   Natural Earth ships "de facto" borders. Decide once, write the rule into About.
   *Owner decision.*
 
 ### 1.3 Bangladesh maps
 
-- `[idea]` ★ **Rivers of Bangladesh** — from the same upazila-era HydroSHEDS/OSM
+- `[done]` v2.1 ★ **Rivers of Bangladesh** — from the same upazila-era HydroSHEDS/OSM
   extract or Natural Earth 10m rivers clipped to BD (PD). Padma, Jamuna, Meghna,
   Karnaphuli, Surma, Teesta, Brahmaputra. Adds "Which river?" questions and finally
   explains *why* the divisions look the way they do.
@@ -90,7 +90,7 @@ Every option below is free to use commercially and works offline once bundled.
   label. Natural Earth 10m `admin_1_states_provinces` (PD).
 - `[idea]` **Upazila level (495)** — we already have the GeoJSON in `.cache`. Too many
   for a quiz; useful as *Explore* only ("Tap your upazila"). Parent toggle.
-- `[idea]` **District map visual QA** — label density, tint contrast, the 64-district
+- `[partial]` v2.1 label clamp; phone check pending **District map visual QA** — label density, tint contrast, the 64-district
   framing option (parked since v1.3). Needs a phone in hand; owner walks through with
   screenshots.
 - `[idea]` **Landmark pins on the BD map** — Sundarbans, Cox's Bazar beach, Sixty Dome
@@ -98,12 +98,12 @@ Every option below is free to use commercially and works offline once bundled.
 
 ### 1.4 Photos
 
-- `[idea]` ★ **One photo per country + one per capital via Wikidata P18** (the "image"
+- `[done]` v2.1 (188/194) ★ **One photo per country + one per capital via Wikidata P18** (the "image"
   property, all Commons-hosted, CC BY / CC BY-SA / PD). Extend `scripts/photos.mjs`:
   query Wikidata → resolve Commons thumbnail → save licence + author for About.
   ≈ 400 photos, automated, one afternoon of run time + a manual glance for
   duds (P18 is occasionally a coat of arms or a map).
-- `[idea]` ★ **One photo per district (64) via Wikidata P18 / Commons category**, with a
+- `[done]` v2.1 (64/64) ★ **One photo per district (64) via Wikidata P18 / Commons category**, with a
   fallback list we curate by hand (we did this for the 8 divisions already).
 - `[idea]` **Bundle low-res copies for offline** — 320 px WebP at quality 70 ≈ 12–18 KB
   each; 480 photos ≈ 7 MB. Today photos are online-only by design; a bundled tier
@@ -114,7 +114,7 @@ Every option below is free to use commercially and works offline once bundled.
   via P18. Powers "Where is this?" mode (3).
 - `[idea]` **Sky / weather / food photos per country** — Commons categories. Lower
   priority, high delight.
-- `[blocked]` **Real children/people in photos** — avoid; use landscapes and buildings
+- `[done]` policy set v2.1: places only **Real children/people in photos** — avoid; use landscapes and buildings
   only. *Policy.*
 
 ### 1.5 Facts and text
@@ -123,7 +123,7 @@ Every option below is free to use commercially and works offline once bundled.
   (P38), official languages (P37), time zone, highest point, longest river, national
   animal/flower/bird (P1830-ish "national symbol"), calling code, driving side, UNESCO
   sites count. One SPARQL run in `build-data.mjs`; no licence text needed.
-- `[idea]` **Native country names** — the v1 spec promised "EN + native"; never landed.
+- `[done]` (was already in data; shown on detail) **Native country names** — the v1 spec promised "EN + native"; never landed.
   Wikidata P1705 (official name) or mledoze `name.native`.
 - `[idea]` **Fun facts, world** — write our own 1–2 sentence facts in EN + BN (as we did
   for divisions). Source of truth: Wikipedia / CIA World Factbook (PD) — paraphrased,
@@ -157,7 +157,7 @@ Every option below is free to use commercially and works offline once bundled.
 | Rivers (world + BD) | Natural Earth rivers, PD | PD | +150 KB | 1 day | ★ |
 | More flags | flag-icons full set | MIT | +0.5 MB | ½ day | ★ |
 | Country/capital/district photos | Wikidata P18 → Commons | CC BY / SA / PD | online 0 · bundled ≈ 7 MB (optional) | 2 days | ★ |
-| Structured facts | Wikidata SPARQL | CC0 | +60 KB | 1 day | ★ |
+| Structured facts | Wikidata SPARQL | CC0 | +60 KB | 1 day | ★ (v2.1 used the existing dataset instead — currency/languages/dial/demonym/tld; symbols & highest point still open) |
 | Fun facts EN+BN | our own writing | ours | +80 KB | batches | ★ |
 | Bangla audio | Google Cloud TTS or voice actor | ok | +1.5 MB | 1–2 days | ★ |
 | Landmarks deck | Wikidata + Commons | CC BY / SA | +1.5 MB | 3 days | later |
@@ -172,7 +172,7 @@ Every option below is free to use commercially and works offline once bundled.
   their own explore pages and a "start here" deck for the youngest children.
 - `[idea]` **Rivers, mountains, deserts** entities with map pins and questions.
 - `[idea]` **Capitals photos** in the country detail (from 1.4).
-- `[idea]` **Currency & language** lines in country detail (from 1.5).
+- `[done]` v2.1 **Currency & language** lines in country detail (from 1.5).
 - `[idea]` **National symbols** deck — animal, bird, flower, tree, fruit, sport for
   Bangladesh (Royal Bengal tiger, doel/magpie robin, shapla, mango tree, jackfruit,
   kabaddi) then neighbours, then the world.
@@ -185,10 +185,10 @@ Every option below is free to use commercially and works offline once bundled.
 
 ## 3. Modes and questions
 
-- `[idea]` ★ **Silhouette quiz** ("Which country is this shape?") — zero new data.
+- `[done]` v2.1 ★ **Silhouette quiz** ("Which country is this shape?") — zero new data.
 - `[idea]` ★ **Where is this photo?** — landmark/capital photo → tap the country on the
   map, or 4 choices. Needs 1.4.
-- `[idea]` **Which continent / which ocean borders it?** — needs 1.2 ocean layer.
+- `[partial]` v2.1 (continent yes, ocean no) **Which continent / which ocean borders it?** — needs 1.2 ocean layer.
 - `[idea]` **Which river flows through?** — needs rivers.
 - `[idea]` **Sort by size / population** (drag 4 countries into order) — new interaction.
 - `[idea]` **Capital ↔ country match** (pairs grid, 6 pairs) — new interaction.
@@ -266,7 +266,7 @@ Every option below is free to use commercially and works offline once bundled.
 
 ---
 
-## Suggested first lift: **V2.1 "Better atlas"** (one release, ≈ 1 week)
+## First lift: **V2.1 "Better atlas"** — shipped 18 September 2026 (see ROADMAP)
 
 1. Natural Earth 50m + Robinson + oceans/continent labels + rivers (1.2, 1.3).
 2. Full flag-icons set with `status` field, UN-members default (1.1).

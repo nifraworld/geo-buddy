@@ -239,9 +239,39 @@ Ideas that are not scheduled live in `DREAM-BACKLOG.md`; releases are lifted fro
     with your email → payment details in the chat → key within a day. The old
     "send to bKash {number}" steps still apply if a number is ever filled in.
   - Left for later: `locked: true` when the free period should end.
+- **V2.1** "Better atlas" — the first lift from `DREAM-BACKLOG.md`. ✅
+  - **World map**: Natural Earth **1:50m** (was 110m) in the **Equal Earth** projection.
+    Every UN member is now on the map (was 165 of 194); 58 small countries get a marker
+    dot until you zoom in enough to tap their shape. Rivers (Natural Earth 50m,
+    scalerank ≤ 4), 18 big lakes, sphere outline, 30° graticule, ocean / sea / continent
+    names in EN + BN. Same-id territories merged into their sovereign (Ashmore → Australia);
+    id-less disputed polygons dropped; collapsed rings guarded (a 3-point ring painted the
+    planet green). Borders policy: as Natural Earth ships them, stated in About.
+  - **Bangladesh rivers** on both BD maps: Padma, Jamuna, Teesta from Natural Earth 10m
+    clipped to Bangladeshi land; Meghna, Karnaphuli, Surma, Rupsha–Pashur traced by hand
+    from known waypoints (marked `approx`). Labelled; the three great rivers at the
+    overview, the rest when zoomed.
+  - **Flags**: all 250 in the dataset (UN + territories). **Explore → World → 🏝️
+    Territories & others**: 56 non-UN places (Palestine, Taiwan, Hong Kong, Greenland…)
+    with a flag, capital, region, area modal. Never in quizzes.
+  - **Facts** on every country page: money, languages, phone code, demonym, web address
+    (all from the existing dataset — no new licence).
+  - **Photos**: Wikidata P18 → Wikimedia Commons for 188 countries (capital skyline
+    first) and all 64 districts, online-only, credited with author + licence. Policy: no
+    people — filename filter + landscape framing + four hand-picked towns. Script:
+    `npm run photos:wd` (`scripts/photos-wikidata.mjs`).
+  - **Two question types**: *Guess the shape* (`wsh`, 136 recognisable silhouettes,
+    size-matched distractors) and *Which continent?* (`wr`). Region decks include shapes.
+  - **QA tooling**: `scripts/shot.mjs` takes phone-sized screenshots of any screen in
+    headless Chrome (`node scripts/shot.mjs map:world,detail:050,quiz:wsh`). District-map
+    label clamp (Chapai Nawabganj was cut at the edge). Smoke test now loads the map
+    globals and checks dots, rivers, lakes, ocean labels, extras, shapes, continents.
+  - Still yours: the district map on a real phone (label density / tint contrast).
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.
+- World map, rivers, lakes: Natural Earth 1:50m / 1:10m (public domain).
+- Country / capital / district photos: Wikidata (CC0) → Wikimedia Commons (per-file licence, credited in-app).
 - Flag artwork: `lipis/flag-icons` (MIT) — flags redrawn from SVG, cached offline.
 - Divisions map: public administrative boundary data (GeoJSON) — simplified to SVG.
 - Division photos: Wikimedia Commons (CC BY/CC BY-SA) — links + attribution shown.

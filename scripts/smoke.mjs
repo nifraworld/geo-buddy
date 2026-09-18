@@ -214,6 +214,14 @@ assert(T.APP_LOCKED === false, "app starts unlocked");
   assert(lakes.length >= 10, "lakes layer present");
   assert(text.some((x) => x.en === "Bay of Bengal" && x.bn) && text.filter((x) => x.kind === "continent").length === 7, "ocean + 7 continent labels, bilingual");
 }
+// v2.1: Bangladesh rivers baked into the division map data
+{
+  const fs = await import("node:fs");
+  const src = fs.readFileSync(new URL("../assets/bd-map-data.js", import.meta.url), "utf8");
+  const rivers = JSON.parse(src.split("var BD_RIVERS = ")[1].split(";" + String.fromCharCode(10))[0]);
+  const names = rivers.map((r) => r.en);
+  assert(["Padma", "Jamuna", "Meghna", "Teesta", "Karnaphuli", "Surma"].every((n) => names.includes(n)) && rivers.every((r) => r.bn && r.d && Number.isFinite(r.lx)), "BD rivers present with Bangla names and label anchors");
+}
 // v2.1: silhouette + continent questions
 {
   const sh = T.countryQuestions("wsh"), wr = T.countryQuestions("wr");
