@@ -91,6 +91,7 @@ const L = {
     sugDivisions: "Bangladesh divisions", sugDistricts: "Bangladesh districts", sugWorld: "World flags, capitals & map",
     learned: "You got these right:", xpGained: "+{n} XP", levelUpTitle: "Level {n}!",
     "map.hint.world": "Tap a country to explore",
+    mapCountBD: "{d} divisions · {z} districts", mapCountWorld: "{c} countries on the map",
     "map.hint.quiz": "Tap the correct place on the map",
     back: "Back",
     search: "Search…",
@@ -170,7 +171,7 @@ const L = {
     tagline: "দেশ, পতাকা, রাজধানী ও মানচিত্র শিখি!",
     "welcome.start": "শুরু করি",
     langSwitch: "English",
-    hello: "নমস্কার", helloDone: "দারুণ!",
+    hello: "হ্যালো", helloDone: "দারুণ!",
     navHome: "হোম", navPlay: "খেলা", navExplore: "ঘুরে দেখি", navParent: "অভিভাবক", navMap: "মানচিত্র", navJourney: "যাত্রা",
     journeyStars: "{total}টির মধ্যে {n} তারা", journeyHint: "প্রতিটি ধাপে একটি তারা পেলে পরেরটি খুলবে",
     tipDaily: "আজকের চ্যালেঞ্জ অপেক্ষা করছে!", tipWeak: "চলো আজ একটা দুর্বল জায়গা ঠিক করি!", tipExplore: "চলো নতুন কোথাও ঘুরে আসি!",
@@ -212,6 +213,7 @@ const L = {
     sugDivisions: "বাংলাদেশের বিভাগ", sugDistricts: "বাংলাদেশের জেলা", sugWorld: "বিশ্বের পতাকা, রাজধানী ও মানচিত্র",
     learned: "এগুলো ঠিক হয়েছে:", xpGained: "+{n} XP", levelUpTitle: "স্তর {n}!",
     "map.hint.world": "দেশে স্পর্শ করো",
+    mapCountBD: "{d}টি বিভাগ · {z}টি জেলা", mapCountWorld: "মানচিত্রে {c}টি দেশ",
     "map.hint.quiz": "সঠিক স্থানে স্পর্শ করো",
     back: "ফিরে যাও",
     search: "খোঁজো…",
@@ -2500,6 +2502,7 @@ function screenMap(params = {}) {
     </div>
     <div class="map-legend"></div>
     <div class="card" id="mapinfo"><p style="color:var(--ink-soft)">👆 ${t(level === "dist" ? "map.hint.bdd" : kind === "bd" ? "map.hint.bd" : "map.hint.world")}</p></div>
+    <p class="ds map-count">${kind === "bd" ? tvar("mapCountBD", { d: DIVS.length, z: DISTS.length }) : tvar("mapCountWorld", { c: GEO.countries.filter((c) => c.hasMap !== false).length })}</p>
     <div class="btn-row"><button class="btn btn-paper" data-nav="play">🎯 ${t("play")}</button></div>`);
 }
 MOUNT.map = (params = {}) => {

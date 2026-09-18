@@ -239,7 +239,18 @@ function worldBuild() {
   for (const f of out.features) {
     const id = String(f.id == null ? "" : f.id).padStart(3, "0");
     paths[id] = gpath(f.geometry) || "";
-    const c = gpath.centroid(f.geometry);
+    // label the mainland: the centroid of a MultiPolygon is dragged by far-off
+    // territories (French Guiana pulled France into the Bay of Biscay, Alaska
+    // pulled the USA west, Svalbard pulled Norway north)
+    let g = f.geometry;
+    if (g.type === "MultiPolygon") {
+      const biggest = g.coordinates.reduce((best, poly) => {
+        const a = gpath.area({ type: "Polygon", coordinates: poly });
+        return a > best.a ? { a, poly } : best;
+      }, { a: -1, poly: null });
+      if (biggest.poly) g = { type: "Polygon", coordinates: biggest.poly };
+    }
+    const c = gpath.centroid(g);
     labels[id] = c ? [Math.round(c[0]), Math.round(c[1])] : null;
   }
 

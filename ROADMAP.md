@@ -1,6 +1,6 @@
 # Geo Buddy — Bangladesh & World Geography for Kids
 
-Repository: `D:\GeoBuddy`  ·  Project: Geo Buddy  ·  Status: v1.9 (admin parity) build
+Repository: `D:\GeoBuddy`  ·  Project: Geo Buddy  ·  Status: v2.0 (mascot + journey) build
 
 An **offline-first PWA** (HTML/JS/CSS + service worker) that borrows the **structure
 and screens of Spelling Buddy** (`spelling.nifraworld.com`) and the **feature ideas of
@@ -82,8 +82,9 @@ geo.nifraworld.com root
 - **V1.3** 64-district level for Bangladesh: district data (2022 census, normalised to
   division totals), district SVG map (dissolved from upazilas), explore districts browse,
   district quiz types (`d-div`, `div-d`, `d-find`), district detail screen, map level toggle. ✅
-  - Follow-ups (parked): visual QA of the district map (label density, tint contrast), a
-    `districts` count line on the Map tab, audited Bangla district names.
+  - Follow-ups: `districts` count line on the Map tab ✅ (v2.0.1); Bangla district names
+    audited ✅ (v2.0.1: কক্সবাজার, নারায়ণগঞ্জ, চাঁপাইনবাবগঞ্জ, রাজবাড়ী). Parked: visual QA
+    of the district map (label density, tint contrast).
 - **V1.4** Pre-sale branding + licence/key system (mirrors Spelling Buddy). ✅
   - `geobuddy.nifraworld.com` + app version shown on welcome, PIN and About
     (v1.4.1: removed from the child-facing top bar so it fits a 360px phone).
@@ -121,8 +122,10 @@ geo.nifraworld.com root
     appear as impossible find-on-map questions (`hasMap`).
   - Leaving the quiz screen abandons the session — its timers used to append the
     next question onto whatever screen came next.
-  - Follow-ups: label anchor audit (Canada/France anchors sit low), Robinson
-    projection, coastline/graticule styling, BD district framing option.
+  - Follow-ups: label anchors ✅ (v2.0.1: a MultiPolygon is labelled at its largest
+    polygon — French Guiana no longer drags France into the sea, Alaska the USA west,
+    Svalbard Norway north; 11 anchors moved). Parked: Robinson projection,
+    coastline/graticule styling, BD district framing option.
 - **V1.5.1** Update flow + visible version. ✅
   - The SW is cache-first and nothing ever told the phone a new build existed, so
     a deploy only appeared on the *second* cold launch. Now: `reg.update()` when the
@@ -141,7 +144,7 @@ geo.nifraworld.com root
     `prefers-reduced-motion`.
   - Fixed: level-up never fired (level compared after stats were already bumped);
     badges are also awarded when Home renders, not only at quiz end.
-  - Open: Bangla greeting নমস্কার → consider হ্যালো/শুভেচ্ছা (neutral).
+  - Bangla greeting নমস্কার → হ্যালো (neutral) ✅ (v2.0.1).
 - **V1.6.1** Typography + dark mode. ✅
   - Baloo Da 2 (OFL, Bengali + Latin, variable weight) bundled and used for headings,
     buttons, prompts and numbers; body stays Noto/system. (The Noto woff2 files the
@@ -220,6 +223,13 @@ geo.nifraworld.com root
     straight away (one screen fewer before playing).
   - Removed the unused `licences.json` manifest. Smoke test covers mascot, journey
     nodes/stars and bonus XP.
+- **V2.0.1** Roadmap follow-ups. ✅
+  - Map tab shows "8 divisions · 64 districts" / "165 countries on the map" under the map.
+  - Bangla district names audited against official spellings (4 fixed).
+  - World-map labels anchored on the mainland polygon (see V1.4.1 follow-ups).
+  - Neutral Bangla greeting হ্যালো; `p.ds` hint paragraphs styled (Journey hint was unstyled).
+  - Still needs you (not code): Cloudflare D1 + secrets, fresh `LICENCE_SECRET`,
+    flip `sale.json` / `APP_LOCKED` when selling starts (`functions/SETUP.md`).
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.
