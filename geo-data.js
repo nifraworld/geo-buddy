@@ -4,7 +4,7 @@
    Division + district stats: BBS 2022 Population and Housing Census.
    Built: 2026-09-18 */
 export const GEO={
-  version:"2.0.1",
+  version:"2.0.2",
   updated:"2026-09-18",
   national:{"en":"Bangladesh","bn":"বাংলাদেশ","capitalEn":"Dhaka","capitalBn":"ঢাকা","divisions":8,"districts":64,"upazilas":495,"unions":4546,"areaKm2":147569,"source":"Bangladesh Bureau of Statistics, 2022 Population and Housing Census","updated":"2026"},
   regions:[{"id":"africa","en":"Africa","bn":"আফ্রিকা","count":54},{"id":"americas","en":"Americas","bn":"আমেরিকা","count":35},{"id":"asia","en":"Asia","bn":"এশিয়া","count":46},{"id":"europe","en":"Europe","bn":"ইউরোপ","count":45},{"id":"oceania","en":"Oceania","bn":"ওশেনিয়া","count":14}],

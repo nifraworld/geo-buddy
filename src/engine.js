@@ -86,6 +86,8 @@ const L = {
     teacher: "Teacher", teacherCode: "Teacher code", teacherCodeSub: "Optional — given with school and coaching plans.", save: "Save", saved: "Saved",
     buyTitle: "Get the full app", buyStep1: "Send the amount by bKash to {bkash} (Send Money)",
     buyStep2: "Message us the bKash number you paid from and your email", buyStep3: "You get your key within a day — type it above",
+    buyWa1: "Tap WhatsApp below and send us your email address", buyWa2: "We reply with the bKash payment details", buyWa3: "After payment you get your key within a day — type it above",
+    buyMsgWa: "Hello! I would like to buy Geo Buddy ({price}).\nEmail: \nDevice: {dev}",
     buyMsg: "Hello! I would like to buy Geo Buddy ({price}).\nEmail: \nbKash number paid from: \nDevice: {dev}",
     sugWeak: "Practise your weak spot", sugNew: "Try something new", sugStart: "Start here",
     sugDivisions: "Bangladesh divisions", sugDistricts: "Bangladesh districts", sugWorld: "World flags, capitals & map",
@@ -209,6 +211,8 @@ const L = {
     buyTitle: "পূর্ণ অ্যাপ নিন", buyStep1: "বিকাশে {bkash} নম্বরে টাকা পাঠান (Send Money)",
     buyStep2: "যে বিকাশ নম্বর থেকে পাঠালেন সেটি ও আপনার ইমেইল আমাদের মেসেজ করুন", buyStep3: "এক দিনের মধ্যে কী পাবেন — উপরে টাইপ করুন",
     buyMsg: "হ্যালো! আমি Geo Buddy কিনতে চাই ({price})।\nইমেইল: \nযে বিকাশ নম্বর থেকে পাঠিয়েছি: \nডিভাইস: {dev}",
+    buyWa1: "নিচের WhatsApp বোতামে চাপ দিয়ে আপনার ইমেইল ঠিকানা পাঠান", buyWa2: "আমরা বিকাশে টাকা পাঠানোর নিয়ম জানিয়ে দেব", buyWa3: "টাকা পাঠানোর পর এক দিনের মধ্যে কী পাবেন — উপরে টাইপ করুন",
+    buyMsgWa: "হ্যালো! আমি Geo Buddy কিনতে চাই ({price})।\nইমেইল: \nডিভাইস: {dev}",
     sugWeak: "দুর্বল জায়গায় অনুশীলন করো", sugNew: "নতুন কিছু চেষ্টা করো", sugStart: "এখান থেকে শুরু",
     sugDivisions: "বাংলাদেশের বিভাগ", sugDistricts: "বাংলাদেশের জেলা", sugWorld: "বিশ্বের পতাকা, রাজধানী ও মানচিত্র",
     learned: "এগুলো ঠিক হয়েছে:", xpGained: "+{n} XP", levelUpTitle: "স্তর {n}!",
@@ -2617,18 +2621,19 @@ function buyCard() {
   const sl = sale();
   if (!sl.selling && !APP_LOCKED) return "";
   const dev = deviceId();
-  const msg = tvar("buyMsg", { price: sl.price || "", dev });
+  // no published bKash number → Spelling Buddy flow: message first, pay after we reply
+  const waFirst = !sl.bkash;
+  const msg = tvar(waFirst ? "buyMsgWa" : "buyMsg", { price: sl.price || "", dev });
   const wa = String(sl.whatsapp || "").replace(/[^0-9]/g, "");
   const waNum = wa.length === 11 && wa[0] === "0" ? "88" + wa : wa;
+  const steps = waFirst
+    ? [t("buyWa1"), t("buyWa2"), t("buyWa3")]
+    : [tvar("buyStep1", { bkash: sl.bkash }) + (sl.nagad ? ` · Nagad ${sl.nagad}` : ""), t("buyStep2"), t("buyStep3")];
   return `
     <div class="card buy">
       <h3>🛒 ${t("buyTitle")}</h3>
       <div class="price"><b>${sl.price || ""}</b><small>${sl.priceNote || ""}</small></div>
-      <ol class="buy-steps">
-        <li>${tvar("buyStep1", { bkash: sl.bkash || "—" })}${sl.nagad ? ` · Nagad ${sl.nagad}` : ""}</li>
-        <li>${t("buyStep2")}</li>
-        <li>${t("buyStep3")}</li>
-      </ol>
+      <ol class="buy-steps">${steps.map((x) => `<li>${x}</li>`).join("")}</ol>
       <div class="btn-row">
         ${waNum ? `<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/${waNum}?text=${encodeURIComponent(msg)}">💬 WhatsApp</a>` : ""}
         ${sl.email ? `<a class="btn btn-paper" href="mailto:${sl.email}?subject=${encodeURIComponent("Geo Buddy")}&body=${encodeURIComponent(msg)}">✉️ Email</a>` : ""}

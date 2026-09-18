@@ -228,8 +228,15 @@ geo.nifraworld.com root
   - Bangla district names audited against official spellings (4 fixed).
   - World-map labels anchored on the mainland polygon (see V1.4.1 follow-ups).
   - Neutral Bangla greeting হ্যালো; `p.ds` hint paragraphs styled (Journey hint was unstyled).
-  - Still needs you (not code): Cloudflare D1 + secrets, fresh `LICENCE_SECRET`,
-    flip `sale.json` / `APP_LOCKED` when selling starts (`functions/SETUP.md`).
+  - Cloudflare D1 + secrets verified live (2026-09-18): `/api/licence` ok, `/api/keys` 401
+    without password, `/api/submit` writes.
+- **V2.0.2** Selling on (2026-09-18). ✅
+  - `sale.json`: `selling: true`, `locked: false`, ৳ 250, WhatsApp 01612203639 (same
+    number as Spelling Buddy), no published bKash number.
+  - Buy card follows the Spelling Buddy flow when `bkash` is empty: message on WhatsApp
+    with your email → payment details in the chat → key within a day. The old
+    "send to bKash {number}" steps still apply if a number is ever filled in.
+  - Left for later: `locked: true` when the free period should end.
 
 ## Sources / attribution
 - Country facts: `mledoze/countries` (ODbL) — attribution shown in About.
