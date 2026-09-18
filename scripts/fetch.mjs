@@ -17,6 +17,18 @@ const SOURCES = {
     url: "https://unpkg.com/world-atlas@2.0.2/countries-110m.json",
     desc: "Natural Earth 1:110m country boundaries as TopoJSON. Public domain (Natural Earth).",
   },
+  "world-50m.json": {
+    url: "https://unpkg.com/world-atlas@2.0.2/countries-50m.json",
+    desc: "Natural Earth 1:50m country boundaries as TopoJSON. Public domain (Natural Earth). v2.1: replaces 110m so small countries exist on the map.",
+  },
+  "ne-rivers-50m.geojson": {
+    url: "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_rivers_lake_centerlines.geojson",
+    desc: "Natural Earth 1:50m rivers and lake centerlines. Public domain (Natural Earth).",
+  },
+  "ne-lakes-50m.geojson": {
+    url: "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_lakes.geojson",
+    desc: "Natural Earth 1:50m lakes. Public domain (Natural Earth).",
+  },
   "countries.json": {
     url: "https://raw.githubusercontent.com/mledoze/countries/master/dist/countries.json",
     desc: "Country facts (name, capital, region, ISO codes). Dataset (c) mledoze/countries, ODbL. Attribution shown in About.",

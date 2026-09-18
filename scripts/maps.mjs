@@ -8,7 +8,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import * as turf from "@turf/turf";
-import { geoMercator, geoEquirectangular, geoPath } from "d3-geo";
+import { geoMercator, geoEquirectangular, geoEqualEarth, geoGraticule, geoArea, geoPath } from "d3-geo";
 import simplify from "simplify-js";
 import { feature as topoFeature } from "topojson-client";
 import { DISTRICTS } from "./districts.mjs";
@@ -206,36 +206,88 @@ function slug(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "-"); }
 function escXml(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
 /* ---------- World ---------- */
+/* v2.1: Natural Earth 1:50m (was 110m) so Singapore, Malta, Bahrain, Mauritius…
+   exist as polygons; Equal Earth projection (the "atlas look", no giant
+   Greenland); a dot marker for every country too small to tap; rivers, lakes
+   and ocean/continent labels as extra layers for the explorer. The paths are
+   still baked into a 900×460 box, which the engine relies on. */
+const W = 900, H = 460;
+const OCEAN_LABELS = [
+  // [lon, lat, en, bn, kind]
+  [-150, 10, "Pacific Ocean", "প্রশান্ত মহাসাগর", "ocean"],
+  [-35, 5, "Atlantic Ocean", "আটলান্টিক মহাসাগর", "ocean"],
+  [78, -20, "Indian Ocean", "ভারত মহাসাগর", "ocean"],
+  [-20, 78, "Arctic Ocean", "উত্তর মহাসাগর", "ocean"],
+  [20, -66, "Southern Ocean", "দক্ষিণ মহাসাগর", "ocean"],
+  [88.5, 15, "Bay of Bengal", "বঙ্গোপসাগর", "sea"],
+  [64, 15, "Arabian Sea", "আরব সাগর", "sea"],
+  [18, 36, "Mediterranean Sea", "ভূমধ্যসাগর", "sea"],
+  [-100, 46, "North America", "উত্তর আমেরিকা", "continent"],
+  [-60, -15, "South America", "দক্ষিণ আমেরিকা", "continent"],
+  [20, 8, "Africa", "আফ্রিকা", "continent"],
+  [22, 54, "Europe", "ইউরোপ", "continent"],
+  [95, 48, "Asia", "এশিয়া", "continent"],
+  [134, -24, "Australia", "অস্ট্রেলিয়া", "continent"],
+  [20, -82, "Antarctica", "অ্যান্টার্কটিকা", "continent"],
+];
+/* countries absent even at 50m: drawn as a small square at their coordinates */
+const MISSING_AT_50M = { "798": [179.2, -8.5] /* Tuvalu */ };
+
 function worldBuild() {
-  const topo = load("world-110m.json");
+  const topo = load("world-50m.json");
   const geo = topoFeature(topo, topo.objects.countries);
   const feats = geo.features;
   console.log("world features:", feats.length);
 
-  // simplify each ring defensively (skip tiny <4-point rings)
-  function simplifyGeom(g) {
-    if (g.type === "Polygon") return { ...g, coordinates: simplifyRing(g.coordinates) };
-    if (g.type === "MultiPolygon") return { ...g, coordinates: g.coordinates.map(simplifyRing) };
+  // simplify each ring defensively (skip tiny <6-point rings)
+  function simplifyGeom(g, tol) {
+    if (g.type === "Polygon") return { ...g, coordinates: simplifyRing(g.coordinates, tol) };
+    if (g.type === "MultiPolygon") return { ...g, coordinates: g.coordinates.map((r) => simplifyRing(r, tol)) };
     return g;
   }
-  function simplifyRing(rings) {
+  function simplifyRing(rings, tol) {
     return rings.map((ring) => {
       if (ring.length < 6) return ring;
       const pts = ring.map(([x, y]) => ({ x, y }));
-      return simplify(pts, 0.15, true).map((p) => [p.x, p.y]);
-    });
+      const out = simplify(pts, tol, true).map((p) => [p.x, p.y]);
+      // a ring collapsed to a sliver (3 distinct points) reads to d3 as "the whole
+      // sphere except this" and paints the planet green — keep the original then
+      if (out.length < 5 || geoArea({ type: "Polygon", coordinates: [out] }) > Math.PI) return ring;
+      return out;
+    }).filter((ring) => geoArea({ type: "Polygon", coordinates: [ring] }) <= Math.PI);
+  }
+  function simplifyLine(g, tol) {
+    const one = (line) => line.length < 4 ? line : simplify(line.map(([x, y]) => ({ x, y })), tol, true).map((p) => [p.x, p.y]);
+    if (g.type === "LineString") return { ...g, coordinates: one(g.coordinates) };
+    if (g.type === "MultiLineString") return { ...g, coordinates: g.coordinates.map(one) };
+    return g;
   }
 
-  const out = { type: "FeatureCollection", features: feats.map((f) => ({
-    type: "Feature", id: f.id, properties: f.properties || {}, geometry: simplifyGeom(f.geometry),
+  // world-atlas gives a dependency its sovereign's id (Ashmore and Cartier Is.
+  // = 036 like Australia) and no id at all to disputed areas (Kosovo, Somaliland,
+  // N. Cyprus, Siachen). Merge same-id features into one MultiPolygon; drop the
+  // id-less ones (they can't be asked about anyway).
+  const byId = new Map();
+  for (const f of feats) {
+    if (f.id == null) continue;
+    const id = String(f.id).padStart(3, "0");
+    const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [];
+    const cur = byId.get(id);
+    if (cur) cur.geometry.coordinates.push(...polys);
+    else byId.set(id, { type: "Feature", id, properties: f.properties || {}, geometry: { type: "MultiPolygon", coordinates: [...polys] } });
+  }
+  const out = { type: "FeatureCollection", features: [...byId.values()].map((f) => ({
+    ...f, geometry: simplifyGeom(f.geometry, 0.08),
   })) };
 
-  const W = 900, H = 460;
-  const proj = geoEquirectangular().fitExtent([[4, 4], [W - 4, H - 4]], out);
+  // fit the *sphere* so the projection frame is stable and Antarctica keeps its place
+  const proj = geoEqualEarth().fitExtent([[4, 4], [W - 4, H - 4]], { type: "Sphere" });
   const gpath = geoPath(proj);
+  const rnd = (n) => Math.round(n * 10) / 10;
 
   const paths = {};
   const labels = {};
+  const dots = {};
   for (const f of out.features) {
     const id = String(f.id == null ? "" : f.id).padStart(3, "0");
     paths[id] = gpath(f.geometry) || "";
@@ -252,23 +304,71 @@ function worldBuild() {
     }
     const c = gpath.centroid(g);
     labels[id] = c ? [Math.round(c[0]), Math.round(c[1])] : null;
+    // too small to tap at 900 px wide → the engine also draws a marker dot
+    const mb = gpath.bounds(g);
+    if (mb && (mb[1][0] - mb[0][0] < 5 || mb[1][1] - mb[0][1] < 5) && c) dots[id] = [rnd(c[0]), rnd(c[1])];
+  }
+  for (const [id, lonlat] of Object.entries(MISSING_AT_50M)) {
+    if (paths[id]) continue;
+    const [x, y] = proj(lonlat);
+    paths[id] = `M${rnd(x - 1.2)},${rnd(y - 1.2)}L${rnd(x + 1.2)},${rnd(y - 1.2)}L${rnd(x + 1.2)},${rnd(y + 1.2)}L${rnd(x - 1.2)},${rnd(y + 1.2)}Z`;
+    labels[id] = [Math.round(x), Math.round(y)];
+    dots[id] = [rnd(x), rnd(y)];
   }
 
+  // sphere outline (so the atlas shape reads as a globe on the water)
+  const sphere = gpath({ type: "Sphere" });
+  // graticule every 30°
+  const grat = gpath(geoGraticule().step([30, 30])());
+
+  // rivers: the important ones (scalerank ≤ 4), simplified; keep names for a future "which river?"
+  const riversSrc = load("ne-rivers-50m.geojson");
+  const rivers = [];
+  for (const f of riversSrc.features) {
+    const p = f.properties || {};
+    if (p.scalerank > 4) continue;
+    const d = gpath(simplifyLine(f.geometry, 0.12));
+    if (!d) continue;
+    rivers.push({ n: p.name || "", d });
+  }
+  // lakes: anything that covers ≥ 6 px² on this map
+  const lakesSrc = load("ne-lakes-50m.geojson");
+  const lakes = [];
+  for (const f of lakesSrc.features) {
+    const a = gpath.area(f.geometry);
+    if (a < 6) continue;
+    const d = gpath(simplifyGeom(f.geometry, 0.08));
+    if (d) lakes.push({ n: (f.properties || {}).name || "", d });
+  }
+  const oceanLabels = OCEAN_LABELS.map(([lon, lat, en, bn, kind]) => {
+    const [x, y] = proj([lon, lat]);
+    return { x: Math.round(x), y: Math.round(y), en, bn, kind };
+  });
+
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">\n`;
+  svg += `  <path d="${sphere}" fill="#CFE8F3"/>\n`;
   for (const id of Object.keys(paths)) {
     if (!paths[id]) continue;
-    svg += `  <path id="wr-${id}" data-id="${id}" d="${paths[id]}" fill="#DCEFD6" stroke="#0E3B2E" stroke-width="0.7" stroke-linejoin="round"/>\n`;
+    svg += `  <path id="wr-${id}" data-id="${id}" d="${paths[id]}" fill="#DCEFD6" stroke="#0E3B2E" stroke-width="0.5" stroke-linejoin="round"/>\n`;
   }
+  for (const l of lakes) svg += `  <path d="${l.d}" fill="#CFE8F3"/>\n`;
+  for (const r of rivers) svg += `  <path d="${r.d}" fill="none" stroke="#6FB7DA" stroke-width="0.6"/>\n`;
   svg += `</svg>\n`;
 
   writeFileSync(ASSETS + "world-map.svg", svg);
   writeFileSync(
     ASSETS + "world-map-data.js",
-    "/* GENERATED by scripts/maps.mjs. Natural Earth 1:110m, ids are ISO 3166-1 numeric codes. */\n" +
+    "/* GENERATED by scripts/maps.mjs. Natural Earth 1:50m, Equal Earth projection, ids are ISO 3166-1 numeric codes. */\n" +
       "var WORLD_MAP = " + JSON.stringify(paths, null, 1) + ";\n" +
-      "var WORLD_LABELS = " + JSON.stringify(labels, null, 1) + ";\n"
+      "var WORLD_LABELS = " + JSON.stringify(labels, null, 1) + ";\n" +
+      "var WORLD_DOTS = " + JSON.stringify(dots) + ";\n" +
+      "var WORLD_SPHERE = " + JSON.stringify(sphere) + ";\n" +
+      "var WORLD_GRAT = " + JSON.stringify(grat) + ";\n" +
+      "var WORLD_RIVERS = " + JSON.stringify(rivers) + ";\n" +
+      "var WORLD_LAKES = " + JSON.stringify(lakes) + ";\n" +
+      "var WORLD_TEXT = " + JSON.stringify(oceanLabels) + ";\n"
   );
-  console.log("wrote world-map.svg + world-map-data.js");
+  console.log(`wrote world-map.svg + world-map-data.js (${Object.keys(paths).length} countries, ${Object.keys(dots).length} dots, ${rivers.length} river segments, ${lakes.length} lakes)`);
 }
 
 /* ---------- Bangladesh districts ---------- */

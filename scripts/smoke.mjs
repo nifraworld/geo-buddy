@@ -170,7 +170,7 @@ for (const ty of ["wf", "wc", "wh", "hc", "world-find"]) {
   const qs = T.countryQuestions(ty);
   const mapped = GEO.countries.filter((c) => c.hasMap !== false).length;
   assert(qs.length === (ty === "world-find" ? mapped : 194), ty + " builds " + (ty === "world-find" ? mapped + " (mapped countries only)" : 194));
-  if (ty === "world-find") assert(mapped < 194 && qs.every((q) => GEO.countries.find((c) => c.id === q.answerId).hasMap !== false), "no find-on-map question for a country absent from the map");
+  if (ty === "world-find") assert(mapped === 194 && qs.every((q) => GEO.countries.find((c) => c.id === q.answerId).hasMap !== false), "v2.1: every UN member is on the 50m map (was 165 at 110m)");
   const q = qs[0];
   assert(q.type === ty, ty + " type kept");
   if (q.kind !== "map") {
@@ -198,6 +198,16 @@ assert(typeof T.licenceLabel() === "string" && T.licenceLabel().length > 0, "lic
 assert(Array.isArray(T.LICENCE_SCOPES) && T.LICENCE_SCOPES.length === 2, "uscopes bd+wr");
 assert(T.APP_LOCKED === false, "app starts unlocked");
 
+// v2.1: atlas layers
+{
+  const src = (await import("node:fs")).readFileSync(new URL("../assets/world-map-data.js", import.meta.url), "utf8");
+  const pick = (k) => JSON.parse(src.split("var " + k + " = ")[1].split(";\n")[0]);
+  const dots = pick("WORLD_DOTS"), rivers = pick("WORLD_RIVERS"), lakes = pick("WORLD_LAKES"), text = pick("WORLD_TEXT");
+  assert(Object.keys(dots).length > 40 && dots["702"] && dots["798"], "marker dots include Singapore and Tuvalu");
+  assert(rivers.length > 100 && rivers.some((r) => /Brahmaputra|Ganges|Nile|Amazon/.test(r.n)), "rivers layer has the big ones");
+  assert(lakes.length >= 10, "lakes layer present");
+  assert(text.some((x) => x.en === "Bay of Bengal" && x.bn) && text.filter((x) => x.kind === "continent").length === 7, "ocean + 7 continent labels, bilingual");
+}
 // v2.0: mascot + journey
 for (const m of ["happy", "wow", "sad", "think", "sleepy"]) assert(T.mascot(m, 40).startsWith("<svg") && T.mascot(m, 40).includes('width="40"'), "mascot " + m + " renders svg");
 const jn = T.journeyNodes();

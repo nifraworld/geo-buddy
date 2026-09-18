@@ -17,6 +17,14 @@ const BD_MAP_D = window.BD_MAP_D || {};
 const BD_LABELS_D = window.BD_LABELS_D || {};
 const WORLD_MAP = window.WORLD_MAP || {};
 const WORLD_LABELS = window.WORLD_LABELS || {};
+// v2.1 atlas layers (assets/world-map-data.js): marker dots for countries too
+// small to tap, sphere outline, graticule, rivers, lakes, ocean/continent names
+const WORLD_DOTS = window.WORLD_DOTS || {};
+const WORLD_SPHERE = window.WORLD_SPHERE || "";
+const WORLD_GRAT = window.WORLD_GRAT || "";
+const WORLD_RIVERS = window.WORLD_RIVERS || [];
+const WORLD_LAKES = window.WORLD_LAKES || [];
+const WORLD_TEXT = window.WORLD_TEXT || [];
 
 const divIdx = {};
 for (const d of DIVS) divIdx[d.id] = d;
@@ -2148,7 +2156,19 @@ function makeMapModel(kind) {
   for (const en of entries) byId[String(en.id)] = en;
   const model = { kind, W, H, oy, entries, byId, toId, kMax: kind === "world" ? 14 : 6 };
   model.scratch = document.createElement("canvas").getContext("2d"); // identity CTM: logical coords
-  model.hit = (x, y) => {
+  // a small country shows a marker dot until zoomed in enough to tap its shape;
+  // `dotR` is the dot radius in logical px at zoom k (≈ 9 CSS px on a 360-px phone)
+  model.dots = kind === "world" ? Object.entries(WORLD_DOTS).map(([k, pos]) => ({ key: k, id: toId(k), x: pos[0], y: pos[1] + oy })).filter((d) => byId[String(d.id)]) : [];
+  // sizes are judged in CSS px on screen: css = cssScale * k * logical
+  model.dotR = (k, css = 1) => 3.5 / (css * k);
+  model.showsDot = (en, k, css = 1) => css * k * Math.min(en.main[2] - en.main[0], en.main[3] - en.main[1]) < 4;
+  model.hit = (x, y, k = 1, css = 1) => {
+    for (const d of model.dots) {
+      const en = model.byId[String(d.id)];
+      if (!model.showsDot(en, k, css)) continue;
+      const r = model.dotR(k, css) * 2.5; // a finger is wider than the dot
+      if ((x - d.x) * (x - d.x) + (y - d.y) * (y - d.y) <= r * r) return d.id;
+    }
     for (let i = model.entries.length - 1; i >= 0; i--) {
       const en = model.entries[i];
       const b = en.bbox;
@@ -2250,7 +2270,7 @@ function attachMapGestures(canvas, md, on) {
   });
   canvas.addEventListener("pointermove", (e) => {
     if (!ptrs.has(e.pointerId)) {
-      if (e.pointerType === "mouse" && on.hover) { const p = evToCanvas(canvas, md, e); on.hover(md.hit(p.x, p.y)); }
+      if (e.pointerType === "mouse" && on.hover) { const p = evToCanvas(canvas, md, e); on.hover(md.hit(p.x, p.y, getView(canvas, md).k, (canvas.clientWidth || md.W) / md.W)); }
       return;
     }
     const prev = ptrs.get(e.pointerId);
@@ -2290,7 +2310,7 @@ function attachMapGestures(canvas, md, on) {
       return;
     }
     lastTap = now;
-    if (on.tap) { const v = getView(canvas, md); on.tap(md.hit((pt.x - v.tx) / v.k, (pt.y - v.ty) / v.k), pt); }
+    if (on.tap) { const v = getView(canvas, md); on.tap(md.hit((pt.x - v.tx) / v.k, (pt.y - v.ty) / v.k, v.k, (canvas.clientWidth || md.W) / md.W), pt); }
   };
   canvas.addEventListener("pointerup", end);
   canvas.addEventListener("pointercancel", end);
@@ -2371,6 +2391,7 @@ function drawMap(canvas, md, opts = {}) {
   const interact = opts.interact !== "none";
   const ink = mapInk();
   ctx.lineJoin = "round";
+  if (md.kind === "world") drawAtlasUnder(ctx, md, v);
   for (const en of md.entries) {
     const id = en.id;
     const isTarget = String(id) === String(opts.target);
@@ -2388,6 +2409,7 @@ function drawMap(canvas, md, opts = {}) {
       ctx.stroke(en.path);
     }
   }
+  if (md.kind === "world") drawAtlasOver(ctx, canvas, md, v, opts);
   if (opts.labels !== false) drawLabels(ctx, canvas, md, v, opts);
   // legend
   const legend = APP.querySelector(".map-legend");
@@ -2395,6 +2417,66 @@ function drawMap(canvas, md, opts = {}) {
     legend.innerHTML = md.kind === "bd" || md.kind === "bd-d"
       ? DIVS.map((d) => `<span><span class="sw" style="background:${DIV_PALETTE[d.id]}"></span>${_lang === "bn" ? d.bn : d.en}</span>`).join("")
       : "";
+  }
+}
+/* atlas layers — the globe outline and a faint 30° graticule sit under the land */
+const ATLAS = { grat: "rgba(14,59,46,.10)", gratDark: "rgba(241,238,228,.10)", edge: "rgba(14,59,46,.35)", edgeDark: "rgba(241,238,228,.35)",
+  river: "#6FB7DA", riverDark: "#3E7EA0", dot: "#F49B1F", dotDark: "#FFB74D", sea: "rgba(14,59,46,.55)", seaDark: "rgba(241,238,228,.55)" };
+let ATLAS_PATHS = null;
+function atlasPaths() {
+  if (ATLAS_PATHS) return ATLAS_PATHS;
+  const P = (d) => { try { return d ? new Path2D(d) : null; } catch { return null; } };
+  ATLAS_PATHS = { sphere: P(WORLD_SPHERE), grat: P(WORLD_GRAT), rivers: WORLD_RIVERS.map((r) => P(r.d)).filter(Boolean), lakes: WORLD_LAKES.map((l) => P(l.d)).filter(Boolean) };
+  return ATLAS_PATHS;
+}
+function drawAtlasUnder(ctx, md, v) {
+  const a = atlasPaths();
+  const dark = isDark();
+  if (a.sphere) {
+    ctx.fillStyle = dark ? "#123246" : "#CFE4F0";
+    ctx.fill(a.sphere);
+  }
+  if (a.grat) {
+    ctx.strokeStyle = dark ? ATLAS.gratDark : ATLAS.grat;
+    ctx.lineWidth = 0.8 / v.k;
+    ctx.stroke(a.grat);
+  }
+}
+function drawAtlasOver(ctx, canvas, md, v, opts) {
+  const a = atlasPaths();
+  const dark = isDark();
+  // lakes are water, rivers thin lines; both get a little bolder as you zoom in
+  ctx.fillStyle = dark ? "#123246" : "#CFE4F0";
+  for (const l of a.lakes) ctx.fill(l);
+  ctx.strokeStyle = dark ? ATLAS.riverDark : ATLAS.river;
+  ctx.lineWidth = Math.min(1.2, 0.5 + v.k * 0.12) / v.k;
+  ctx.lineCap = "round";
+  for (const r of a.rivers) ctx.stroke(r);
+  if (a.sphere) { ctx.strokeStyle = dark ? ATLAS.edgeDark : ATLAS.edge; ctx.lineWidth = 1.2 / v.k; ctx.stroke(a.sphere); }
+  // marker dots for countries still too small to tap at this zoom
+  const cssScale = (canvas.clientWidth || md.W) / md.W;
+  const r = md.dotR(v.k, cssScale);
+  for (const d of md.dots) {
+    const en = md.byId[String(d.id)];
+    if (!en || !md.showsDot(en, v.k, cssScale)) continue;
+    const isT = String(d.id) === String(opts.target), isP = String(d.id) === String(opts.picked);
+    ctx.beginPath(); ctx.arc(d.x, d.y - md.oy, r, 0, Math.PI * 2);
+    ctx.fillStyle = opts.ok && isT ? "#2FA56A" : isP && !opts.ok ? "#F49B1F" : (!opts.ok && opts.picked && isT) ? "#7FD19F" : (dark ? ATLAS.dotDark : ATLAS.dot);
+    ctx.globalAlpha = 0.85; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.lineWidth = 1 / (cssScale * v.k); ctx.strokeStyle = dark ? "#0F1D18" : "#FFFFFF"; ctx.stroke();
+  }
+  // ocean / sea / continent names — atlas typography. Oceans always (until
+  // zoomed right in), seas once there is room, continents only at the overview
+  const px = (n) => n / (cssScale * v.k);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (const tx of WORLD_TEXT) {
+    if (tx.kind === "continent" && v.k > 1.8) continue;
+    if (tx.kind === "sea" && (v.k < 2 || v.k > 7)) continue;
+    if (tx.kind === "ocean" && v.k > 5) continue;
+    const label = _lang === "bn" ? tx.bn : tx.en;
+    if (tx.kind === "continent") { ctx.font = `800 ${px(11)}px 'Noto Sans Bengali', sans-serif`; ctx.fillStyle = dark ? "rgba(241,238,228,.16)" : "rgba(14,59,46,.14)"; }
+    else { ctx.font = `italic 600 ${px(tx.kind === "ocean" ? 10 : 9)}px 'Noto Sans Bengali', sans-serif`; ctx.fillStyle = dark ? ATLAS.seaDark : ATLAS.sea; }
+    ctx.fillText(label, tx.x, tx.y);
   }
 }
 /* Labels are sized in on-screen CSS px (not map units) so they stay readable
